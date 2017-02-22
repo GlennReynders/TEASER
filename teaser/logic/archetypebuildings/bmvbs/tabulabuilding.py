@@ -1,8 +1,5 @@
 # created June 2015
 # by TEASER4 Development Team
-from teaser.data.bindings.opengis.citygml.raw.building import Building
-from teaser.project import Project
-
 from teaser.logic.archetypebuildings.residential \
     import Residential
 from teaser.logic.buildingobjects.boundaryconditions.boundaryconditions \
@@ -16,6 +13,9 @@ from teaser.logic.buildingobjects.buildingphysics.outerwall import OuterWall
 from teaser.logic.buildingobjects.buildingphysics.rooftop import Rooftop
 from teaser.logic.buildingobjects.buildingphysics.window import Window
 from teaser.logic.buildingobjects.thermalzone import ThermalZone
+from teaser.logic.buildingobjects.buildingphysics.layer import Layer
+from teaser.logic.buildingobjects.buildingphysics.material import Material
+from teaser.project import Project
 
 
 class TabulaBuilding(Residential):
@@ -184,35 +184,6 @@ class TabulaBuilding(Residential):
 
         # [area factor, usage type(has to be set)]
         self.zone_area_factors = {"SingleDwelling": [1, "Living"]}
-        """
-        self.outer_wall_list = []
-        self.rooftop_list = []
-        self.ground_floor_list = []
-        self.window_list = []
-        self.door_list = []
-
-        self.outer_wall_names = {"Exterior Facade North": [90.0, 0.0],
-                                 "Exterior Facade East": [90.0, 90.0],
-                                 "Exterior Facade South": [90.0, 180.0],
-                                 "Exterior Facade West": [90.0, 270.0]}
-        # [tilt, orientation]
-
-        self.roof_names = {"Rooftop": [0, -1]}  # [0, -1]
-
-        self.ground_floor_names = {"Ground Floor": [0, -2]}  # [0, -2]
-
-        self.window_names = {"Window Facade North": [90.0, 0.0],
-                             "Window Facade East": [90.0, 90.0],
-                             "Window Facade South": [90.0, 180.0],
-                             "Window Facade West": [90.0, 270.0]}
-        # [tilt, orientation]
-
-        self.inner_wall_names = {"InnerWall": [90.0, 0.0]}
-
-        self.ceiling_names = {"Ceiling": [0.0, -1]}
-
-        self.floor_names = {"Floor": [0.0, -2]}
-        """
 
         self.est_living_area_factor = 0.75  # fW
         self.est_bottom_building_closure = 1.33  # p_FB
@@ -220,7 +191,7 @@ class TabulaBuilding(Residential):
         self.est_factor_win_area = 0.2
         self.est_factor_cellar_area = 0.5
 
-        #self.nr_of_orientation = len(self.outer_wall_names)
+        self.nr_of_orientation = 1
 
         # estimated intermediate calculated values
         self._living_area_per_floor = 0
@@ -302,6 +273,127 @@ class TabulaBuilding(Residential):
             self.central_ahu.profile_v_flow = (
                 7 * [0.0] + 12 * [1.0] + 6 * [0.0])
 
+    def get_elements_from_file(self, zone):
+        '''
+        Get a all elements from a XML file and set it to a thermalzone
+        '''
+
+        for outerwall in self.parent.data.element_bind.OuterWall:
+            if outerwall.building_age_group == self.construction_period:
+                wall = OuterWall(zone)
+                wall.name = "OuterWall"
+                wall.construction_type = outerwall.construction_type
+                wall.year_of_construction = \
+                    outerwall.year_of_construction
+                wall.building_age_group = outerwall.building_age_group
+                wall.inner_convection = outerwall.inner_convection
+                wall.inner_radiation = outerwall.inner_radiation
+                wall.outer_convection = outerwall.outer_convection
+                wall.outer_radiation = outerwall.outer_radiation
+                wall.orientation = 0
+                for layer_bind in outerwall.Layers.layer:
+                    layer = Layer(wall)
+                    layer.id = layer_bind.id - 1
+                    layer.thickness = layer_bind.thickness
+                    for mat in self.parent.data.material_bind.Material:
+                        if mat.material_id == layer_bind.material.material_id:
+                            material = Material(layer)
+                            material.name = mat.name
+                            material.density = mat.density
+                            material.thermal_conduc = mat.thermal_conduc
+                            material.heat_capac = mat.heat_capac
+
+        for rooftop in self.parent.data.element_bind.Rooftop:
+                wall = Rooftop(zone)
+                wall.name = "Rooftop"
+                wall.construction_type = rooftop.construction_type
+                wall.year_of_construction = \
+                    rooftop.year_of_construction
+                wall.building_age_group = rooftop.building_age_group
+                wall.inner_convection = rooftop.inner_convection
+                wall.inner_radiation = rooftop.inner_radiation
+                wall.outer_convection = rooftop.outer_convection
+                wall.outer_radiation = rooftop.outer_radiation
+                for layer_bind in rooftop.Layers.layer:
+                    layer = Layer(wall)
+                    layer.id = layer_bind.id - 1
+                    layer.thickness = layer_bind.thickness
+                    for mat in self.parent.data.material_bind.Material:
+                        if mat.material_id == layer_bind.material.material_id:
+                            material = Material(layer)
+                            material.name = mat.name
+                            material.density = mat.density
+                            material.thermal_conduc = mat.thermal_conduc
+                            material.heat_capac = mat.heat_capac
+
+        for groundfloor in self.parent.data.element_bind.GroundFloor:
+                wall = GroundFloor(zone)
+                wall.name = "GroundFloor"
+                wall.construction_type = groundfloor.construction_type
+                wall.year_of_construction = \
+                    groundfloor.year_of_construction
+                wall.building_age_group = groundfloor.building_age_group
+                wall.inner_convection = groundfloor.inner_convection
+                wall.inner_radiation = groundfloor.inner_radiation
+                for layer_bind in groundfloor.Layers.layer:
+                    layer = Layer(wall)
+                    layer.id = layer_bind.id - 1
+                    layer.thickness = layer_bind.thickness
+                    for mat in self.parent.data.material_bind.Material:
+                        if mat.material_id == layer_bind.material.material_id:
+                            material = Material(layer)
+                            material.name = mat.name
+                            material.density = mat.density
+                            material.thermal_conduc = mat.thermal_conduc
+                            material.heat_capac = mat.heat_capac
+
+        for window in self.parent.data.element_bind.Window:
+                wall = Window(zone)
+                wall.name = "Window"
+                wall.construction_type = window.construction_type
+                wall.year_of_construction = \
+                    window.year_of_construction
+                wall.building_age_group = window.building_age_group
+                wall.inner_convection = window.inner_convection
+                wall.inner_radiation = window.inner_radiation
+                wall.outer_convection = window.outer_convection
+                wall.outer_radiation = window.outer_radiation
+                for layer_bind in window.Layers.layer:
+                    layer = Layer(wall)
+                    layer.id = layer_bind.id - 1
+                    layer.thickness = layer_bind.thickness
+                    for mat in self.parent.data.material_bind.Material:
+                        if mat.material_id == layer_bind.material.material_id:
+                            material = Material(layer)
+                            material.name = mat.name
+                            material.density = mat.density
+                            material.thermal_conduc = mat.thermal_conduc
+                            material.heat_capac = mat.heat_capac
+
+        self.number_of_floors = 0
+        for floor in self.parent.data.element_bind.Floor:
+            if floor.building_age_group == self.construction_period:
+                self.number_of_floors += 1
+                wall = Floor(zone)
+                wall.name = "Floor"
+                wall.construction_type = floor.construction_type
+                wall.year_of_construction = \
+                    floor.year_of_construction
+                wall.building_age_group = floor.building_age_group
+                wall.inner_convection = floor.inner_convection
+                wall.inner_radiation = floor.inner_radiation
+                for layer_bind in floor.Layers.layer:
+                    layer = Layer(wall)
+                    layer.id = layer_bind.id - 1
+                    layer.thickness = layer_bind.thickness
+                    for mat in self.parent.data.material_bind.Material:
+                        if mat.material_id == layer_bind.material.material_id:
+                            material = Material(layer)
+                            material.name = mat.name
+                            material.density = mat.density
+                            material.thermal_conduc = mat.thermal_conduc
+                            material.heat_capac = mat.heat_capac
+
     def generate_archetype(self):
         """Generates a SingleFamilyDwelling building for Tabula.
 
@@ -316,7 +408,6 @@ class TabulaBuilding(Residential):
         for key, value in self.zone_area_factors.items():
             zone = ThermalZone(self)
             zone.name = key
-            print(type_bldg_area)
             zone.area = type_bldg_area * value[0]
             use_cond = UseCond(zone)
             use_cond.load_use_conditions(value[1],
@@ -325,21 +416,8 @@ class TabulaBuilding(Residential):
             zone.use_conditions = use_cond
 
         for zone in self.thermal_zones:
-                # create wall and set building elements
-                outer_wall = OuterWall(zone)
-                outer_wall.load_type_element(
-                    year=1870,
-                    construction=self.construction_type,
-                    data_class=self.parent.data)
-                outer_wall.name = key
-                outer_wall.tilt = value[0]
-                outer_wall.orientation = value[1]
-                print(outer_wall)
+                self.get_elements_from_file(zone)
 
-        print(self._est_factor_heated_cellar)
-        print(self.number_of_floors)
-        print(self.est_living_area_factor)
-        print(self._est_factor_heated_attic)
         self._number_of_heated_floors = self._est_factor_heated_cellar + \
             self.number_of_floors + self.est_living_area_factor \
             * self._est_factor_heated_attic
@@ -375,135 +453,20 @@ class TabulaBuilding(Residential):
 
         # self._est_factor_volume = type_bldg_area * 2.5
 
-        for key, value in self.outer_wall_names.items():
-            # North and South
-
-            if value[1] == 0 or value[1] == 180.0:
-                self.outer_area[value[1]] = self._est_outer_wall_area / \
-                                            self.nr_of_orientation
-            # East and West
-            elif value[1] == 90 or value[1] == 270:
-
-                self.outer_area[value[1]] = self._est_outer_wall_area / \
-                                            self.nr_of_orientation
-
-            for zone in self.thermal_zones:
-                # create wall and set building elements
-                outer_wall = OuterWall(zone)
-                outer_wall.load_type_element(
-                    year=self.year_of_construction,
-                    construction=self.construction_type,
-                    data_class=self.parent.data)
-                outer_wall.name = key
-                outer_wall.tilt = value[0]
-                outer_wall.orientation = value[1]
-
-        for key, value in self.window_names.items():
-
-            if value[1] == 0 or value[1] == 180:
-
-                self.window_area[value[1]] = self._est_win_area / \
+        orientation = 0
+        self.outer_area[orientation] = self._est_outer_wall_area / \
                                              self.nr_of_orientation
 
-            elif value[1] == 90 or value[1] == 270:
-
-                self.window_area[value[1]] = self._est_win_area / \
+        self.window_area[orientation] = self._est_win_area / \
                                              self.nr_of_orientation
 
-            '''
-            There is no real classification for windows, so this is a bit hard
-            code - will be fixed sometime
-            '''
-            for zone in self.thermal_zones:
-                window = Window(zone)
-
-                window.load_type_element(self.year_of_construction,
-                                         "Kunststofffenster, "
-                                         "Isolierverglasung",
-                                         data_class=self.parent.data)
-                window.name = key
-                window.tilt = value[0]
-                window.orientation = value[1]
-
-        for key, value in self.roof_names.items():
-
-            self.outer_area[value[1]] = self._est_roof_area
-
-            for zone in self.thermal_zones:
-                roof = Rooftop(zone)
-                roof.load_type_element(
-                    year=self.year_of_construction,
-                    construction=self.construction_type,
-                    data_class=self.parent.data)
-                roof.name = key
-                roof.tilt = value[0]
-                roof.orientation = value[1]
-
-        for key, value in self.ground_floor_names.items():
-
-            self.outer_area[value[1]] = self._est_ground_floor_area
-
-            for zone in self.thermal_zones:
-                ground_floor = GroundFloor(zone)
-                ground_floor.load_type_element(
-                    year=self.year_of_construction,
-                    construction=self.construction_type,
-                    data_class=self.parent.data)
-                ground_floor.name = key
-                ground_floor.tilt = value[0]
-                ground_floor.orientation = value[1]
-
-        for key, value in self.inner_wall_names.items():
-
-            for zone in self.thermal_zones:
-                inner_wall = InnerWall(zone)
-                inner_wall.load_type_element(
-                    year=self.year_of_construction,
-                    construction=self.construction_type,
-                    data_class=self.parent.data)
-                inner_wall.name = key
-                inner_wall.tilt = value[0]
-                inner_wall.orientation = value[1]
-                # zone.inner_walls.append(inner_wall)
-
-        if self.number_of_floors > 1:
-
-            for key, value in self.ceiling_names.items():
-
-                for zone in self.thermal_zones:
-                    ceiling = Ceiling(zone)
-                    ceiling.load_type_element(
-                        year=self.year_of_construction,
-                        construction=self.construction_type,
-                        data_class=self.parent.data)
-                    ceiling.name = key
-                    ceiling.tilt = value[0]
-                    ceiling.orientation = value[1]
-                    # zone.inner_walls.append(ceiling)
-
-            for key, value in self.floor_names.items():
-
-                for zone in self.thermal_zones:
-                    floor = Floor(zone)
-                    floor.load_type_element(
-                        year=self.year_of_construction,
-                        construction=self.construction_type,
-                        data_class=self.parent.data)
-                    floor.name = key
-                    floor.tilt = value[0]
-                    floor.orientation = value[1]
-                    # zone.inner_walls.append(floor)
-        else:
-            pass
+        ground_floor_orienatation = -2
+        self.outer_area[ground_floor_orienatation] = self._est_ground_floor_area
 
         for key, value in self.outer_area.items():
             self.set_outer_wall_area(value, key)
         for key, value in self.window_area.items():
             self.set_window_area(value, key)
-
-        for zone in self.thermal_zones:
-            zone.set_inner_wall_area()
-            zone.set_volume_zone()
 
     def generate_from_gml(self):
         """Enriches lod1 or lod2 data from CityGML
@@ -746,12 +709,12 @@ if __name__ == '__main__':
     import teaser.logic.utilities as utils
     prj = Project()
     data = DataClass()
-    data.path_tb = utils.get_full_path(
+    """  data.path_tb = utils.get_full_path(
             "data/input/inputdata/TypeBuildingElements.xml")
-    data.path_tb = utils.get_full_path(
+    data.path_mat = utils.get_full_path(
             "data/input/inputdata/MaterialTemplates2.xml")
-    #data.path_tb('C:/Users/Trust/git/TabulaTEASER/tabula/Output/Germany/TabulaGermany.xml')
-    #data.path_mat("C:/Users/Trust/git/TabulaTEASER/tabula/Output/Germany/MaterialTemplates2.xml")
+    data.load_tb_binding()
+    data.load_mat_binding()"""
     prj.data = data
-    bld = TabulaBuilding(prj)
+    bld = TabulaBuilding(prj, construction_period= [1969, 1978])
     bld.generate_archetype()

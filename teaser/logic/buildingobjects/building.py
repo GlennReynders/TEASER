@@ -8,6 +8,7 @@ import random
 import re
 from teaser.logic.buildingobjects.calculation.aixlib import AixLib
 from teaser.logic.buildingobjects.calculation.annex60 import Annex60
+from teaser.logic.buildingobjects.calculation.ideas import IDEAS
 
 
 from teaser.logic.buildingobjects.buildingsystems.buildingahu \
@@ -106,9 +107,10 @@ class Building(object):
     used_library_calc : str
         'AixLib' for https://github.com/RWTH-EBC/AixLib
         'Annex60' for https://github.com/iea-annex60/modelica-annex60
-    library_attr : Annex() or AixLib() instance
+        'IDEAS" for https://github.com/open-ideas/IDEAS
+    library_attr : Annex(), AixLib() or IDEAS() instance
         Classes with specific functions and attributes for building models in
-        Annex60 and AixLib. Python classes can be found in calculation package.
+        Annex60, AixLib and IDEAS. Python classes can be found in calculation package.
 
     """
 
@@ -433,7 +435,7 @@ class Building(object):
             True for merging the windows into the outer walls, False for
             separate resistance for window, default is False
         used_library : str
-            used library (AixLib and Annex60 are supported)
+            used library (AixLib, Annex60 and IDEAS are supported)
         """
 
         self._number_of_elements_calc = number_of_elements
@@ -452,6 +454,8 @@ class Building(object):
             self.library_attr.calc_auxiliary_attr()
         elif self.used_library_calc == 'Annex60':
             self.library_attr = Annex60(parent=self)
+        elif self.used_library_calc == 'IDEAS':
+            self.library_attr = IDEAS(parent=self)
 
     def retrofit_building(
             self,
@@ -753,9 +757,9 @@ class Building(object):
     @used_library_calc.setter
     def used_library_calc(self, value):
 
-        ass_error_1 = "used library needs to be AixLib or Annex60"
+        ass_error_1 = "used library needs to be AixLib, Annex60 or IDEAS"
 
-        assert value != ["AixLib", "Annex60"], ass_error_1
+        assert value != ["AixLib", "Annex60", "IDEAS"], ass_error_1
 
         if self.parent is None and value is None:
             self._used_library_calc = 2

@@ -8,9 +8,9 @@
 
 TEASER (Tool for Energy Analysis and Simulation for Efficient Retrofit) allows
 fast generation of archetype buildings with low input requirements and the
-export of individual dynamic simulation models for Modelica libraries [AixLib](https://github.com/RWTH-EBC/AixLib) and
-[IEA-EBC Annex60](https://github.com/iea-annex60/modelica-annex60). It is being
-developed at the [RWTH Aachen University, E.ON Energy Research Center, Institute
+export of individual dynamic simulation models for Modelica libraries [AixLib](https://github.com/RWTH-EBC/AixLib),
+[IEA-EBC Annex60](https://github.com/iea-annex60/modelica-annex60) and [IDEAS] (https://github.com/open-ideas/IDEAS).
+It is being developed at the [RWTH Aachen University, E.ON Energy Research Center, Institute
 for Energy Efficient Buildings and Indoor Climate](https://www.ebc.eonerc.rwth-aachen.de/cms/~dmzz/E-ON-ERC-EBC/?lidx=1).
 
 The full documentation of TEASER including examples and description of modules,
@@ -40,8 +40,9 @@ time consuming and error-prone. To enable the use of BPS on urban scale we
 present the TEASER tool, an open framework for urban energy modeling of
 building stocks. TEASER provides an easy interface for multiple data sources,
 data enrichment (where necessary) and export of ready-to-run Modelica simulation
-models for [AixLib](https://github.com/RWTH-EBC/AixLib) and
-[IEA-EBC Annex60](https://github.com/iea-annex60/modelica-annex60).
+models for [AixLib](https://github.com/RWTH-EBC/AixLib),
+[IEA-EBC Annex60](https://github.com/iea-annex60/modelica-annex60) and
+[IDEAS] (https://github.com/open-ideas/IDEAS).
 
 
 ## Version

@@ -10,9 +10,9 @@ import teaser.logic.utilities as utilities
 from mako.template import Template
 
 def export_ideas(buildings,
-                         prj,
-                         path=None,
-                         building_model="One-zone"):
+                 prj,
+                 path=None,
+                 building_model="One-zone"):
     """Exports models for IDEAS library
 
         Exports a building for detailed IDEAS Building model (currently
@@ -36,109 +36,53 @@ def export_ideas(buildings,
         building_model : string
             Currently, only export to one-zone models is supported. Two-zone models
             will be added soon
-
-        Attributes
-        ----------
-
-        lookup : TemplateLookup object
-            Instance of mako.TemplateLookup to store general functions for templates
-        zone_template_1 : Template object
-            Template for ThermalZoneRecord using 1 element model
-        zone_template_2 : Template object
-            Template for ThermalZoneRecord using 2 element model
-        zone_template_3 : Template object
-            Template for ThermalZoneRecord using 3 element model
-        zone_template_4 : Template object
-            Template for ThermalZoneRecord using 4 element model
-        model_template : Template object
-            Template for MultiZone model
         """
 
-    # check the arguments
-    # in case there are other export options added, then add here the option
-    # default is detailed
     assert building_model in ["One-zone"]
-
-    #software versions that should be used when opening the Modelica files
     uses = [
         'Modelica(version="' + prj.modelica_info.version + '")',
         'IDEAS(version="' + prj.buildings[-1].library_attr.version + '")']
 
-    # CREATION OF PACKAGE.MO AND PACKAGE.ORDER (project level)
-    _help_package(path, prj.name, uses, within=None)
-    _help_package_order(path, buildings, extra_list=[prj.name + "_Project"])
-    #create project.mo file
-    _help_project(path, prj, buildings)
+    #create project.mo, package.mo and package.order on project level
+    _help_project(path=path, prj=prj, buildings=buildings, uses=uses)
 
-    #for now, the only option is detailed
     if building_model == "One-zone":
         print("Exporting to one-zone IDEAS building models")
-        #project.mo file
         for bldg in buildings:
-            #PATH VARIABLES
+            #path variables
             bldg_path = os.path.join(path,bldg.name) + "/"
             occupant_path = bldg_path + "Occupant/"
             structure_path = bldg_path + "Structure/"
+            structure_filepath = utilities.get_full_path(structure_path + bldg.name
+                +"_Structure.mo")
             data_path = structure_path + "Data/"
             materials_path = data_path + "Materials/"
             constructions_path = data_path + "Constructions/"
+            #folder creation
+            _help_foldercreation(bldg_path=bldg_path, structure_path=structure_path,
+                                 materials_path=materials_path, constructions_path=constructions_path)
 
-            #FOLDER CREATION
-            _help_foldercreation(bldg_path, structure_path, materials_path, constructions_path)
+            #create building.mo, package.mo and package.order on building level
+            _help_building(bldg_path=bldg_path, prj=prj, bldg=bldg)
+            #create occupant.mo, package.mo and package.order on occupant level
+            _help_occupant(occupant_path=occupant_path, prj=prj, bldg=bldg)
+            #create structure.mo, package.mo and package.order on structure level
+                #(here initialisation, then addition of zones and components)
+            _help_structure(structure_path=structure_path,
+                            structure_filepath=structure_filepath,
+                            data_path=data_path,
+                            prj=prj, bldg=bldg)
+            #create help file for connections to add to structure.mo
+            help_connections = open(utilities.get_full_path(structure_path +
+                                                    "help_connections.txt"), 'w')
+            help_connections.close()
 
-            # CREATION OF PACKAGE.MO AND PACKAGE.ORDER
-            # building level
-            _help_package(bldg_path, bldg.name, within=prj.name)
-            _help_package_order(bldg_path, [bldg], "_Building",
-                                ["Structure", "HeatingSystem", \
-                                 "VentilationSystem", "ElectricalSystem", \
-                                 "Occupant"], [bldg])
-            # structure
-            _help_package(structure_path, "Structure",
-                          within=prj.name + "." + bldg.name,
-                          packagedescription=
-                          "Package of the particular building structure")
-            _help_package_order(structure_path, [bldg], "_Structure", ["Data"], [])
-            # data
-            _help_package(data_path, "Data",
-                          within=prj.name + "." + bldg.name + ".Structure",
-                          kindofpackage="MaterialProperties",
-                          packagedescription=
-                          "Data for transient thermal building simulation")
-            _help_package_order(data_path, [], None, ["Materials", "Constructions"], [])
+            bldg_materials = [] #required for package.order on materials level
+            bldg_constructions = [] #required for package.order on constructions level
 
-            #occupant
-            _help_package(occupant_path, "Occupant",
-                          within=prj.name + "." + bldg.name,
-                          packagedescription=
-                          "Package of the particular building occupant")
-            _help_package_order(occupant_path, [], "", ["ISO13790"], [])
-
-            #CREATION OF MODELICA MODELS
-                # we create the building.mo file
-            _help_building(bldg_path, prj= prj, bldg= bldg)
-
-                #we create the occupant.mo file
-            _help_occupant(occupant_path, prj, bldg)
-                # we start creating the structure.mo file
-                #(here initialisation, then addition of zones & components)
-            structure_filepath = utilities.get_full_path(
-                                    structure_path + bldg.name
-                                    + "_Structure.mo")
-            _help_structure(structure_filepath, bldg, prj)
-
-                #we create a help file for the connections in structure.mo
-            help_file = open(utilities.get_full_path(structure_path +
-                                                    "help_file.txt"), 'w')
-            help_file.close()
-
-            # we need all material names and construction names for this building
-            # required for the package.order file
-            bldg_materials = []
-            bldg_constructions = []
             for zoneindex, zone in enumerate(bldg.thermal_zones, start = 1):
-                #loop all building elements of this zone
-                buildingelements = zone.outer_walls + zone.inner_walls + zone.windows
+                buildingelements = zone.outer_walls + zone.rooftops + zone.ground_floors \
+                        + zone.inner_walls + zone.ceilings + zone.floors + zone.windows
                 count_windows = 0
                 count_outerwalls = 0
                 count_rooftops = 0
@@ -147,207 +91,212 @@ def export_ideas(buildings,
                 count_ceilings = 0
                 count_floors = 0
                 count_elementsinzone = 0
-                for elementindex, buildingelement in enumerate(buildingelements, start = 1):
-                    #elementindex is required for annotation placement
-                    #create lists with all building elements for this zone
-                    #create materials.mo and constructions.mo
+                for elementindex, buildingelement in enumerate(buildingelements, start = 1): #index required for annotation placement
                     construction_mats = ""
-                    construction_resistance = 0
+                    #create material.mo
                     for layerelement in buildingelement.layer:
                         material = layerelement.material
-                        # add the material to the construction outputstring
-                        # required for the construction.mo file
-                        # required dataformat: Materials.BrickMe(d=0.08), ...
+                        #add the material to the construction outputstring
                         modelicapathtomaterial = "Data.Materials." + \
                                             material.name.replace(" ", "")
                         construction_mats = construction_mats + \
                                             modelicapathtomaterial + \
                                             "(d=" + \
                                             str(layerelement.thickness) + "),"
-                        # required for glazing.mo
-                        construction_resistance = construction_resistance + \
-                                            (layerelement.thickness / \
-                                             material.thermal_conduc)
                         if material.name.replace(" ", "") in bldg_materials:
                             pass #material is already created for this building
                         else:
                             #create material.mo
-                            _help_records(recordTemplate="Material", recordPath=materials_path, prj = prj, bldg = bldg, material= material)
-                            # add material name to the bldg_materials list
+                            _help_records(recordTemplate="Material",
+                                          recordPath=materials_path,
+                                          prj=prj, bldg=bldg,
+                                          material=material)
+                            #add material name to the bldg_materials list
                             bldg_materials.append(material.name.replace(" ", ""))
 
-
-
+                    #check which type of building element and add it to structure.mo
                     if type(buildingelement).__name__ == "Window":
                         count_windows += 1
                         count_elementsinzone += 1
-                        # rename element, required for citygml import
+                        #rename element, required when citygml import
                         if buildingelement.name == "None":
                             buildingelement.name = "Window_" + str(count_windows)
                         else:
                             buildingelement.name = buildingelement.name + "_" + str(count_windows)
-
-
-                        # add this window to the structure.mo file + create its glazing and its frame
-                        _help_window(structure_path=structure_path, prj= prj, bldg=bldg, zone= zone, buildingelement=buildingelement, zoneindex=zoneindex, elementindex = elementindex,
-                                     count_elementsinzone=count_elementsinzone,constructions_path= constructions_path)
-                        # add construction name to the bldg_constructions list (both glazing and frame)
+                        #add to structure.mo + create glazing.mo and frame.mo
+                        _help_window(structure_path=structure_path,
+                                     prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                                     buildingelement=buildingelement, elementindex=elementindex,
+                                     count_elementsinzone=count_elementsinzone,
+                                     constructions_path=constructions_path)
+                        #add construction name to the bldg_constructions list (both glazing and frame)
                         bldg_constructions.append(buildingelement.name.replace(" ", "")
                                                   + "_Glazing")
                         bldg_constructions.append(buildingelement.name.replace(" ", "")
                                                   + "_Frame")
-
                     else: #if no window, then opaque for sure
-                        #add this buildingelement to the structure.mo file
                         if type(buildingelement).__name__ == "OuterWall":
                             count_outerwalls += 1
                             count_elementsinzone +=1
+                            #rename element
                             if buildingelement.name == "None":
                                 buildingelement.name = "OuterWall_" + str(count_outerwalls)
                             else:
                                 buildingelement.name = buildingelement.name + "_" + str(count_outerwalls)
-
-                            #add this outerwall to the structure.mo file
-                            _help_buildingelement(ideasTemplate="OuterWall", structurefile_path =structure_filepath, prj = prj, bldg = bldg, zone = zone,
-                                            buildingelement= buildingelement, zoneindex=zoneindex, elementindex=elementindex, count_elementsinzone=count_elementsinzone,
-                                            inc = "incWall",
-                                            azi = (buildingelement.orientation-180)/180, #TEASER orientation vs IDEAS orientation
-                                            structure_path= structure_path,
-                                            path = constructions_path)
+                            #add to structure.mo
+                            _help_buildingelement(ideasTemplate="OuterWall",
+                                                  structure_path=structure_path,
+                                                  structurefile_path=structure_filepath,
+                                                  constructions_path=constructions_path,
+                                                  prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                                                  buildingelement=buildingelement, elementindex=elementindex,
+                                                  count_elementsinzone=count_elementsinzone,
+                                                  construction_mats=construction_mats,
+                                                  inc="incWall",
+                                                  azi=(buildingelement.orientation-180)/180)
+                                                    # TEASER orientation vs IDEAS orientation
 
                         elif type(buildingelement).__name__ == "Rooftop":
                             count_rooftops += 1
                             count_elementsinzone +=1
+                            #rename element
                             if buildingelement.name == "None":
                                 buildingelement.name = "Rooftop_" + str(count_rooftops)
                             else:
                                 buildingelement.name = buildingelement.name + "_" + str(count_rooftops)
-
                             if buildingelement.orientation == -1:
                                 inc = "incCeil"
                             else:
                                 inc = buildingelement.tilt
-                            #add this rooftop to the structure.mo file
-                            _help_buildingelement(ideasTemplate="OuterWall", structurefile_path=structure_filepath,
-                                                  prj=prj, bldg=bldg, zone = zone,
-                                                  buildingelement=buildingelement, zoneindex=zoneindex, elementindex=elementindex, count_elementsinzone=count_elementsinzone,
-                                                  inc= inc, structure_path= structure_path, path = constructions_path)
-
-
+                            #add to structure.mo
+                            _help_buildingelement(ideasTemplate="OuterWall",
+                                                  structure_path=structure_path,
+                                                  structurefile_path=structure_filepath,
+                                                  constructions_path=constructions_path,
+                                                  prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                                                  buildingelement=buildingelement, elementindex=elementindex,
+                                                  count_elementsinzone=count_elementsinzone,
+                                                  construction_mats=construction_mats,
+                                                  inc=inc)
                         elif type(buildingelement).__name__ == "GroundFloor":
                             count_groundfloors += 1
                             count_elementsinzone += 1
+                            #rename element
                             if buildingelement.name == "None":
                                 buildingelement.name = "Groundfloor_" + str(count_groundfloors)
                             else:
                                 buildingelement.name = buildingelement.name + "_" + str(count_groundfloors)
-
-                            #add this groundfloor to the structure.mo file
-                            _help_buildingelement(ideasTemplate="SlabOnGround", structurefile_path=structure_filepath, prj=prj, bldg=bldg, zone = zone,
-                                                  buildingelement=buildingelement, zoneindex=zoneindex, elementindex=elementindex, count_elementsinzone=count_elementsinzone,
-                                                  inc="incFloor",
-                                                  structure_path= structure_path,
-                                                  path = constructions_path)
-
+                            #add to structure.mo
+                            _help_buildingelement(ideasTemplate="SlabOnGround",
+                                                  structure_path=structure_path,
+                                                  structurefile_path=structure_filepath,
+                                                  constructions_path=constructions_path,
+                                                  prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                                                  buildingelement=buildingelement, elementindex=elementindex,
+                                                  count_elementsinzone=count_elementsinzone,
+                                                  construction_mats=construction_mats,
+                                                  inc="incFloor")
                         elif type(buildingelement).__name__ == "InnerWall":
                             count_innerwalls +=1
                             count_elementsinzone +=2 #element is in IDEAS InternalWall, dus 2 connectionpoints to zone
+                            #rename element
                             if buildingelement.name == "None":
                                 buildingelement.name = "InnerWall_" + str(count_innerwalls)
                             else:
                                 buildingelement.name = buildingelement.name + "_" + str(count_innerwalls)
-                            # add this innerwall to the structure.mo file
-                            _help_buildingelement(ideasTemplate="InnerWall", structurefile_path=structure_filepath, prj = prj, bldg = bldg, zone = zone,
-                                            buildingelement=buildingelement, zoneindex=zoneindex, elementindex=elementindex, count_elementsinzone=count_elementsinzone,
-                                            inc="incWall" ,
-                                            azi= (buildingelement.orientation-180)/180, #TEASER orientation vs IDEAS orientation
-                                            structure_path= structure_path,
-                                            path= constructions_path)
-
+                            # add to structure.mo
+                            _help_buildingelement(ideasTemplate="InnerWall",
+                                                  structure_path=structure_path,
+                                                  structurefile_path=structure_filepath,
+                                                  constructions_path=constructions_path,
+                                                  prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                                                  buildingelement=buildingelement, elementindex=elementindex,
+                                                  count_elementsinzone=count_elementsinzone,
+                                                  construction_mats=construction_mats,
+                                                  inc="incWall",
+                                                  azi=(buildingelement.orientation-180)/180)
+                                                        #TEASER orientation vs IDEAS orientation
                         elif type(buildingelement).__name__ == "Ceiling":
                             count_ceilings += 1
                             count_elementsinzone += 2 #element is in IDEAS InternalWall, dus 2 connectionpoints to zone
+                            #rename element
                             if buildingelement.name == "None":
                                 buildingelement.name = "Ceiling_" + str(count_ceilings)
                             else:
                                 buildingelement.name = buildingelement.name + "_" + str(count_ceilings)
-
-                            #add this ceiling to the structure.mo file
-                            _help_buildingelement(ideasTemplate="InnerWall", structurefile_path=structure_filepath, prj = prj,
-                                                  bldg = bldg, zone = zone, buildingelement=buildingelement, elementindex=elementindex, zoneindex=zoneindex,
-                                                  count_elementsinzone=count_elementsinzone,inc = "incCeil",
-                                                  structure_path= structure_path,
-                                                  path = constructions_path)
-
+                            #add to structure.mo
+                            _help_buildingelement(ideasTemplate="InnerWall",
+                                                  structure_path=structure_path,
+                                                  structurefile_path=structure_filepath,
+                                                  constructions_path=constructions_path,
+                                                  prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                                                  buildingelement=buildingelement, elementindex=elementindex,
+                                                  count_elementsinzone=count_elementsinzone,
+                                                  construction_mats=construction_mats,
+                                                  inc="incCeil")
                         elif type(buildingelement).__name__ == "Floor":
                             count_floors += 1
                             count_elementsinzone += 2 #element is in IDEAS InternalWall, dus 2 connectionpoints to zone
+                            #rename element
                             if buildingelement.name == "None":
                                 buildingelement.name = "Floor_" + str(count_floors)
                             else:
                                 buildingelement.name = buildingelement.name + "_" + str(count_floors)
-
-                            #add this floor to the structure.mo file
-                            _help_buildingelement(ideasTemplate="InnerWall", structurefile_path=structure_filepath,
-                                                prj=prj, bldg=bldg, zone= zone, buildingelement=buildingelement,
-                                                zoneindex=zoneindex, elementindex=elementindex, count_elementsinzone=count_elementsinzone,
-                                                inc = "incFloor", structure_path= structure_path, path = constructions_path)
-
+                            #add to structure.mo
+                            _help_buildingelement(ideasTemplate="InnerWall",
+                                                  structure_path=structure_path,
+                                                  structurefile_path=structure_filepath,
+                                                  construction_mats=construction_mats,
+                                                  constructions_path=constructions_path,
+                                                  prj=prj, bldg=bldg, zone= zone, zoneindex=zoneindex,
+                                                  buildingelement=buildingelement, elementindex=elementindex,
+                                                  count_elementsinzone=count_elementsinzone,
+                                                  inc="incFloor")
                         else:
                             print("This building element, named " + buildingelement.name +
                                   " \n is neither a Window(), nor an OuterWall(), nor a Rooftop(), " +
                                   " \n nor a Groundfloor(), nor an InnerWall(), nor a Ceiling(), " +
                                   " \n nor a Floor() and was therefore not exported")
-                        # add construction name to the bldg_constructions list
+                        #add construction name to the bldg_constructions list
                         bldg_constructions.append(buildingelement.name.replace(" ", ""))
-                        # add element to constructions.mo
-                        _help_records(recordTemplate="Construction", recordPath=constructions_path, prj=prj, bldg=bldg,
-                                  buildingelement=buildingelement, construction_mats=construction_mats)
+                #add this zone to the structure.mo file + add connections to help_connections
+                _help_zone(structure_path=structure_path,
+                           prj=prj, bldg=bldg, zone=zone, zoneindex=zoneindex,
+                           count_elementsinzone=count_elementsinzone)
 
-                # add this zone to the structure.mo file and add connections to help_file
-                _help_zone(structure_path, bldg, prj, zone, zoneindex, count_elementsinzone)
-
-            # add connections from help_file to the structure.mo file
-            out_file = open(utilities.get_full_path(structure_path +
+            #add connections from help_connections to the structure.mo file
+            structure_file = open(utilities.get_full_path(structure_path +
                                          bldg.name + "_Structure.mo"), 'a')
-            out_file.write("equation\n")
-            help_file = open(utilities.get_full_path(structure_path +
-                                                    "help_file.txt"), 'r')
-            out_file.write(help_file.read())
-            help_file.close()
-            # add last sentence to the structure.mo file
-            out_file.write("end "+ bldg.name + "_Structure;")
-            out_file.close()
-            # delete the help_file.txt
-            os.remove(structure_path + "help_file.txt")
+            structure_file.write("equation\n")
+            help_connections = open(utilities.get_full_path(structure_path +
+                                                    "help_connections.txt"), 'r')
+            structure_file.write(help_connections.read())
+            help_connections.close()
+            #add last sentence to the structure.mo file
+            structure_file.write("end "+ bldg.name + "_Structure;")
+            structure_file.close()
+            #delete the help_connections.txt
+            os.remove(structure_path + "help_connections.txt")
 
-            # CREATION OF PACKAGE.MO AND PACKAGE.ORDER
-            # constructions(kindofpackage=same as IDEAS.BUILDING.DATA)
+            #create package.mo and package.order on constructions level
             _help_package(constructions_path, "Constructions",
                           within=prj.name + "." + bldg.name + \
                                  ".Structure.Data",
                           kindofpackage="MaterialProperties",
-                          packagedescription=
-                          "Library of building envelope constructions")
+                          packagedescription="Library of building envelope constructions")
             _help_package_order(constructions_path, [], None, bldg_constructions, [])
-                # materials (kindofpackage is same as in IDEAS.BUILDING.DATA)
+            #create package.mo and package.order on materials level
             _help_package(materials_path, "Materials",
                           within=prj.name + "." + bldg.name + \
                                  ".Structure.Data",
                           kindofpackage="MaterialProperties",
-                          packagedescription=
-                          "Library of construction materials")
+                          packagedescription="Library of construction materials")
             _help_package_order(materials_path, [], None, bldg_materials, [])
-
+        print("Exports can be found here:")
+        print(path)
     else:
-        #export is not detailed, so is not supported
         print("Please indicate a supported mode for export \
-        (for now only: Detailed), for this reason nothing has been exported")
-
-
-
-    print("Exports can be found here:")
-    print(path)
+        (for now only: One-zone), for this reason nothing has been exported")
 
 def _help_foldercreation (bldg_path, structure_path, materials_path, constructions_path):
     # we create a folder for each building
@@ -369,8 +318,6 @@ def _help_foldercreation (bldg_path, structure_path, materials_path, constructio
     utilities.create_path(utilities.get_full_path(materials_path))
     utilities.create_path(utilities.get_full_path(constructions_path))
 
-
-
 def _help_package(path, name, uses=None, within=None,
                   kindofpackage=None, packagedescription=None):
     '''creates a package.mo file
@@ -380,6 +327,8 @@ def _help_package(path, name, uses=None, within=None,
         path of where the package.mo should be placed
     name : string
         name of the Modelica package
+    uses : [string]
+       array containing strings with which Modelica version and which IDEAS version was used
     within : string
         path of Modelica package containing this package
     '''
@@ -400,15 +349,17 @@ def _help_package_order(path, package_list_with_addition, addition=None, extra_l
     ----------
     path : string
         path of where the package.order should be placed
-    package_list : [string]
+    package_list_with_addition : [string]
         name of all models or packages contained in the package
     addition : string
         if there should be a suffix in front of package_list.string it can
         be specified
-    extra : [string]
+    extra_list : [string]
         an extra package or model not contained in package_list can be
         specified, necessary in IDEAS for the folders Structure,
         HeatingSystem, ...
+    package_list_without : [string]
+        name of all models or packages containd in the package, that don't require the addition
     '''
     order_template = Template(filename=utilities.get_full_path
     ("data/output/modelicatemplate/ideas/package_order"))
@@ -422,42 +373,34 @@ def _help_package_order(path, package_list_with_addition, addition=None, extra_l
                     extra=extra_list))
     out_file.close()
 
-def _help_records(recordTemplate, recordPath, prj, bldg, buildingelement = None, material = None, construction_mats = "", nameofglazinginIDEAS = "", frame_uvalue=0):
+def _help_records(recordTemplate, recordPath, prj, bldg, buildingelement=None, material=None, construction_mats="", nameofglazinginIDEAS="", frame_uvalue=0):
      #make sure that path = constructions_path when recordTemplate = Construction, Glazing or Frame"
      #make sure that path = materials_path when recordTemplate = Material
 
-     #recordTemplate, recordPath, prj and bldg are always required, rest is additional and checked
-
     assert recordTemplate in ["Construction", "Glazing", "Frame", "Material"]
-
     filepath = utilities.get_full_path("data/output/modelicatemplate/ideas/")
-    window_uvalue = 0
 
     if recordTemplate == "Construction":
         template = Template(filename=filepath + "ideas_ConstructionRecord")
         recordname = recordPath + buildingelement.name.replace(" ", "") + ".mo"
         assert buildingelement is not None
         assert construction_mats is not ""
-
     elif recordTemplate == "Glazing":
         template = Template(filename=filepath + "ideas_GlazingRecord")
         recordname = recordPath + buildingelement.name.replace(" ", "")\
                                 + "_Glazing.mo"
         assert buildingelement is not None
         assert nameofglazinginIDEAS is not ""
-
     elif recordTemplate == "Frame": #not yet in use
         template = Template(filename=filepath + "ideas_FrameRecord")
         recordname = recordPath + buildingelement.name.replace(" ", "")\
                                 + "_Frame.mo"
         assert buildingelement is not None
         assert frame_uvalue is not 0
-
     elif recordTemplate == "Material":
         template = Template(filename=filepath+"ideas_MaterialRecord")
         recordname = recordPath + material.name.replace(" ", "") + ".mo"
         assert material is not None
-
     else:
         print("I'm sorry, I cannot find an IDEAS recordtemplate for this record")
 
@@ -466,7 +409,7 @@ def _help_records(recordTemplate, recordPath, prj, bldg, buildingelement = None,
     out_file.write(template.render_unicode(
         mod_prj=prj.name,
         bldg=bldg,
-        #only required for construction, glazing and frame
+        #required for construction, glazing and frame
         buildingelement=buildingelement,
         #only required for construction
         construction_mats=construction_mats[:-1],  # delete last comma
@@ -478,12 +421,12 @@ def _help_records(recordTemplate, recordPath, prj, bldg, buildingelement = None,
         mat=material))
     out_file.close()
 
-def _help_buildingelement(ideasTemplate, structurefile_path, prj, bldg, zone,
-                        buildingelement, zoneindex,  elementindex,count_elementsinzone,
-                        inc, structure_path, path, azi = "aziSouth", construction_mats="",
-                        construction_resistance=0, material = None, ):
-    assert ideasTemplate in ["OuterWall", "SlabOnGround", "InnerWall", "Window", "BoundaryWall"]
+def _help_buildingelement(ideasTemplate, structure_path, structurefile_path, constructions_path,
+                          prj, bldg, zone, zoneindex,
+                          buildingelement, elementindex, count_elementsinzone,
+                          construction_mats, inc, azi = "aziSouth"):
 
+    assert ideasTemplate in ["OuterWall", "SlabOnGround", "InnerWall", "Window", "BoundaryWall"]
     filepath = utilities.get_full_path(
         "data/output/modelicatemplate/ideas/")
     if ideasTemplate == "OuterWall":
@@ -498,7 +441,7 @@ def _help_buildingelement(ideasTemplate, structurefile_path, prj, bldg, zone,
         template = Template(filename=filepath + "ideas_BoundaryWall")
     else:
         print("I'm sorry, I cannot find an IDEAS template for this BuildingElement()")
-
+    #add component to structure.mo
     out_file = open(structurefile_path, 'a')
     out_file.write(
         template.render_unicode(
@@ -510,14 +453,13 @@ def _help_buildingelement(ideasTemplate, structurefile_path, prj, bldg, zone,
             inc=inc,
             azi=azi))
     out_file.close()
-#todo/ kijk naar alle helpfuncties en predeclare de variabelen die je kan, zodat je enkel hoogstnodige moet geven indien je functie aanroept, dan kan je hier contruction record laten aanmaken per buildingelement, daarna kijken of window er ook nog bij kan
-    # create construction.mo for this building element
-        # is currently done above, should be moved here
-
-    # add connections for this buildingelement to help_file
+    #create construction.mo
+    _help_records(recordTemplate="Construction", recordPath=constructions_path, prj=prj, bldg=bldg,
+                  buildingelement=buildingelement, construction_mats=construction_mats)
+    #add component-connection statements to help_connections
     _help_connectcomponents(structure_path, buildingelement, zone, count_elementsinzone, ideasTemplate = ideasTemplate)
 
-def _help_window (structure_path, prj, bldg, zone, buildingelement, zoneindex, elementindex, count_elementsinzone, constructions_path):
+def _help_window (structure_path, constructions_path, prj, bldg, zone, zoneindex, buildingelement, elementindex, count_elementsinzone):
     #this should be deleted, for now okay, because teaser input is not able to go as detailed as now
     if bldg.year_of_construction <= 1945:
         nameofglazinginIDEAS = "EpcSingle"
@@ -538,7 +480,7 @@ def _help_window (structure_path, prj, bldg, zone, buildingelement, zoneindex, e
         nameofglazinginIDEAS = "Ins2Ar"
         frame_uvalue = 3 #self defined, for this moment, same as 2006-2011 > Change this
 
-    # add window to structure.mo
+    #add window to structure.mo
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     window_template = Template(
@@ -554,19 +496,16 @@ def _help_window (structure_path, prj, bldg, zone, buildingelement, zoneindex, e
         elementindex = elementindex,
         count_elementsinzone= count_elementsinzone))
     out_file.close()
-
-    # create glazing.mo
+    #create glazing.mo
     _help_records(recordTemplate="Glazing", recordPath=constructions_path, prj = prj, bldg = bldg, buildingelement=buildingelement,
                   nameofglazinginIDEAS= nameofglazinginIDEAS)
-
-    # create frame.mo (not yet in use)
+    #create frame.mo (not yet in use)
     _help_records(recordTemplate="Frame", recordPath=constructions_path, prj= prj, bldg = bldg, buildingelement=buildingelement,
                   frame_uvalue= frame_uvalue)
-
-    #connect components
+    #add component-connection statements
     _help_connectcomponents(structure_path, buildingelement, zone, count_elementsinzone)
 
-def _help_zone (structure_path, bldg, prj, zone, zoneindex, count_elementsinzone):
+def _help_zone (structure_path, prj, bldg, zone, zoneindex, count_elementsinzone):
     #add zone to structure.mo file
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
@@ -581,39 +520,39 @@ def _help_zone (structure_path, bldg, prj, zone, zoneindex, count_elementsinzone
                                                 count_elementsinzone = count_elementsinzone))
     out_file.close()
 
-    # add zone connections
+    #add zone-connection statements
     _help_connectzones(structure_path, zone, zoneindex)
 
-def _help_connectcomponents (structure_path, buildingelement, zone, count_elementsinzone, ideasTemplate= ""):
-
+def _help_connectcomponents (structure_path, zone, buildingelement, count_elementsinzone, ideasTemplate= ""):
+    #add component-connection statements to help_connections
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     connectcomponents_template = Template(
         filename=filepath + "ideas_ConnectComponents")
-    help_file = open(utilities.get_full_path(structure_path +
-                                            "help_file.txt"), 'a')
-    help_file.write(connectcomponents_template.render_unicode(
+    help_connections = open(utilities.get_full_path(structure_path +
+                                            "help_connections.txt"), 'a')
+    help_connections.write(connectcomponents_template.render_unicode(
         buildingelement=buildingelement,
         zone=zone,
         index=count_elementsinzone,
         ideasTemplate = ideasTemplate))
-    help_file.close()
+    help_connections.close()
 
 def _help_connectzones (structure_path, zone, zoneindex):
-
+    #add zone-connection statements to help_connections
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     connectzones_templates = Template(
         filename=filepath + "ideas_ConnectZones")
-    help_file = open(utilities.get_full_path(structure_path +
-                                            "help_file.txt"), 'a')
-    help_file.write(connectzones_templates.render_unicode(
+    help_connections = open(utilities.get_full_path(structure_path +
+                                            "help_connections.txt"), 'a')
+    help_connections.write(connectzones_templates.render_unicode(
                                         zone=zone,
                                         index=zoneindex))
-    help_file.close()
+    help_connections.close()
 
-def _help_structure (structure_filepath, bldg, prj):
-
+def _help_structure (structure_path, structure_filepath, data_path, prj, bldg):
+    #create structure.mo
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     structure_template = Template(
@@ -622,22 +561,35 @@ def _help_structure (structure_filepath, bldg, prj):
     out_file.write(structure_template.render_unicode(bldg=bldg,
                                                      mod_prj=prj.name))
     out_file.close()
+    #create package.mo and package.order on structure level
+    _help_package(structure_path, "Structure",
+                  within=prj.name + "." + bldg.name,
+                  packagedescription=
+                  "Package of the particular building structure")
+    _help_package_order(structure_path, [bldg], "_Structure", ["Data"], [])
+    #create package.mo and package.order on data level
+    _help_package(data_path, "Data",
+                  within=prj.name + "." + bldg.name + ".Structure",
+                  kindofpackage="MaterialProperties",
+                  packagedescription=
+                  "Data for transient thermal building simulation")
+    _help_package_order(data_path, [], None, ["Materials", "Constructions"], [])
 
-def _help_heatingsystem (path, name, ):
+def _help_heatingsystem ():
 
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     heatingsystem_template = Template(
         filename=filepath + "ideas_HeatingSystem")
 
-def _help_ventilationsystem (path, name, ):
+def _help_ventilationsystem ():
 
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     ventilationsystem_template = Template(
         filename=filepath + "ideas_VentilationSystem")
 
-def _help_electricalsystem (path, name, ):
+def _help_electricalsystem ():
 
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
@@ -645,7 +597,7 @@ def _help_electricalsystem (path, name, ):
         filename=filepath + "ideas_ElectricalSystem")
 
 def _help_occupant (occupant_path, prj, bldg):
-
+    #create occupant.mo
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     occupant_template = Template(
@@ -655,8 +607,15 @@ def _help_occupant (occupant_path, prj, bldg):
                                                     mod_prj=prj.name))
     out_file.close()
 
+    #create package.mo and package.order on occupant level
+    _help_package(occupant_path, "Occupant",
+                  within=prj.name + "." + bldg.name,
+                  packagedescription=
+                  "Package of the particular building occupant")
+    _help_package_order(occupant_path, [], "", ["ISO13790"], [])
+
 def _help_building (bldg_path, prj, bldg):
-    #Building.mo model
+    #building.mo model
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
     building_template = Template(
@@ -676,7 +635,13 @@ def _help_building (bldg_path, prj, bldg):
                                                     mod_prj=prj.name))
     out_file.close()
 
-def _help_project(path, prj, buildings):
+    _help_package(bldg_path, bldg.name, within=prj.name)
+    _help_package_order(bldg_path, [bldg], "_Building",
+                        ["Structure", "HeatingSystem", \
+                         "VentilationSystem", "ElectricalSystem", \
+                         "Occupant"], [bldg])
+
+def _help_project(path, prj, buildings, uses):
 
     filepath = utilities.get_full_path(
             "data/output/modelicatemplate/ideas/")
@@ -687,3 +652,6 @@ def _help_project(path, prj, buildings):
     out_file.write(template.render_unicode(prj_name=prj.name,
                     buildings = buildings))
     out_file.close()
+
+    _help_package(path, prj.name, uses, within=None)
+    _help_package_order(path, buildings, extra_list=[prj.name + "_Project"])

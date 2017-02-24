@@ -9,6 +9,7 @@ import re
 from teaser.logic.buildingobjects.calculation.aixlib import AixLib
 from teaser.logic.buildingobjects.calculation.annex60 import Annex60
 from teaser.logic.buildingobjects.calculation.ideas import IDEAS
+from decimal import *
 
 
 from teaser.logic.buildingobjects.buildingsystems.buildingahu \
@@ -147,9 +148,13 @@ class Building(object):
         self.latitude = 50.79
 
         self._thermal_zones = []
-        self.gml_surfaces = []
         self._outer_area = {}
         self._window_area = {}
+
+        self.gml_surfaces = []
+        self.deleted_surfaces_area = 0
+        self.number_of_deleted_walls = 0
+        self.list_of_neighbours = []
 
         self.bldg_height = None
         self.volume = 0
@@ -279,6 +284,88 @@ class Building(object):
             for ground in zone.ground_floors:
                 if ground.orientation == orientation:
                     ground.area = ((new_area / self.net_leased_area) * zone.area)
+
+    def reset_outer_wall_area (self, gml_surface):
+
+        for bldg in self.parent.buildings:
+            if bldg.internal_id == self.internal_id:
+                pass #don't compare with the same building
+            else: # if other building, add to common area
+                for neighbour_gml_surface in bldg.gml_surfaces:
+                    #loop each SurfaceGML() in the list of this potential neighbour building and check if coplanar
+                    #first check if neighbour_gml_surface is a wall (reduce computation time)
+                    if neighbour_gml_surface.surface_tilt == 90:
+                        if self.check_if_coplanar(gml_surface, neighbour_gml_surface):
+                            #so unit_normal and constant are exactly the same
+                            #ASSUMPTION: each common wall is separated into multiple surface, the common and not-common
+                            #part of the comman wall are just separate
+                            #surface in GML. So, in depth, we don't need to do any checking. Only, in height, we need to.
+                            #functions to calculate the common area are included, in case your CityGML has not the same
+                            #features
+
+                            #check if this buildig is higher than the neighbour building
+                            #in that case: lower the OuterWall() area with the common area
+                            #else: delete the OuterWall() as a whole
+                            orientation = gml_surface.surface_orientation
+                            for zone in self.thermal_zones:
+                                if self.bldg_height > bldg.bldg_height:
+                                    new_area = gml_surface.surface_area - neighbour_gml_surface.surface_area
+                                    orientation = gml_surface.surface_orientation
+                                    self.set_outer_wall_area(new_area=new_area, orientation= orientation)
+                                    #print("Deleted outerwall area from " + self.name + " is " + str(neighbour_gml_surface.surface_area))
+                                    self.deleted_surfaces_area += neighbour_gml_surface.surface_area
+                                    self.number_of_deleted_walls += 1
+                                    #add to list of neighbours
+                                    if bldg.name.replace(" ", "") in self.list_of_neighbours:
+                                        pass  #this neighbour is already in list
+                                    else:
+                                        self.list_of_neighbours.append(bldg.name.replace(" ", ""))
+                                else:
+                                    #erase wall from list if orientation and area are the same
+                                    zone.outer_walls[:] = [wall for wall in zone.outer_walls if wall.orientation != orientation and wall.area != ((gml_surface.surface_area *
+                                             (1- self.est_factor_win_area) / self.net_leased_area) * zone.area)]
+                                    #print("Outerwall from " + self.name + " is deleted as a whole, area was " + str(gml_surface.surface_area))
+                                    self.deleted_surfaces_area += gml_surface.surface_area
+                                    self.number_of_deleted_walls += 1
+                                    #add to list of neighbours
+                                    if bldg.name.replace(" ", "") in self.list_of_neighbours:
+                                        pass  #  this neighbour is already in list
+                                    else:
+                                        self.list_of_neighbours.append(bldg.name.replace(" ", ""))
+                                # in each case, erase window from list if orientation is the same
+                                zone.windows[:] = [window for window in zone.windows if window.orientation != orientation and window.area != ((gml_surface.surface_area *
+                                    self.est_factor_win_area / self.net_leased_area) * zone.area)]
+
+    def check_if_coplanar(self, gml_surface, neighbour_gml_surface):
+
+        basewall_help = gml_surface.gml_surface  # this is the coordinate list of the considered wall
+        basewall_unit_normal = gml_surface.unit_normal_vector  # this is the unit normal vector of the considered wall
+        basewall_constant = gml_surface.plane_equation_constant  # this is the plane equation constant of the considered wall
+        basewall_equation = [elem for elem in basewall_unit_normal]
+        basewall_equation.append(basewall_constant)  # now, we have a list [normal_x, normal_y, normal_z, constant]
+
+        neighbour_help = neighbour_gml_surface.gml_surface  # this is the coordinate list of this possible neighbour
+        neighbour_unit_normal = neighbour_gml_surface.unit_normal_vector
+        neighbour_constant = neighbour_gml_surface.plane_equation_constant
+        neighbour_equation = [elem for elem in neighbour_unit_normal]
+        neighbour_equation.append(neighbour_constant)
+
+        #elements from the equations arrays are floats, we convert them to decimal (correct comparison test)
+        #transform floats to decimals
+        basewall_equation = [Decimal.from_float(i) for i in basewall_equation]
+        neighbour_equation = [Decimal.from_float(i) for i in neighbour_equation]
+        #round these decimals
+        basewall_equation = [i.quantize(Decimal('0.00000001'), rounding= ROUND_HALF_DOWN) for i in basewall_equation]
+        neighbour_equation = [i.quantize(Decimal('0.00000001'), rounding= ROUND_HALF_DOWN) for i in neighbour_equation]
+
+        #check if equal
+        if (basewall_equation[0] == (-1)*neighbour_equation[0] and basewall_equation[1] == (-1)*neighbour_equation[1]\
+            and basewall_equation[2] == (-1)*neighbour_equation[2] and basewall_equation[3] == (-1)*neighbour_equation[3])\
+            or (basewall_equation[0] == neighbour_equation[0] and basewall_equation[1] == neighbour_equation[1]\
+            and basewall_equation[2] == neighbour_equation[2] and basewall_equation[3] == neighbour_equation[3]):
+            return True
+        else:
+            return False
 
     def set_window_area(
             self,

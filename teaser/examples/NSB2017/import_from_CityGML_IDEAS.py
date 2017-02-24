@@ -1,15 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov  1 16:33:20 2016
-
-@author: ina
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Tue Nov  1 16:09:15 2016
 
-@author: ina
+@author: Ina De Jaeger (KU Leuven, EnergyVille)
 """
 from teaser.project import Project
 import teaser.logic.utilities as utilitis
@@ -37,15 +30,11 @@ def example_type_building():
         Parameters:	
                 path : string
                 full path to a CityGML file """
-    prj.load_citygml(path="C:\Users\ina\Documents\GRB\CityGML Example files\MuisstraatGML_FME_232527.gml")
+    prj.load_citygml(path="C:\Users\ina\Documents\GRB\CityGML Example files\MuisstraatGML_FME_232527.gml", lookforneighbours=True)
 
     prj.used_library_calc = 'IDEAS'
     prj.calc_all_buildings(raise_errors=True)
     prj.export_ideas()
-    for building in prj.buildings:
-        print building.name
-        for element in building.outer_area:
-            print element
 
 if __name__ == '__main__':
     example_type_building()

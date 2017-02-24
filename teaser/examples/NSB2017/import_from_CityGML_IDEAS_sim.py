@@ -37,7 +37,7 @@ def example_type_building():
         Parameters:	
                 path : string
                 full path to a CityGML file """
-    prj.load_citygml(path= "C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION\NSB2017\FME\MuisstraatGML_FME.gml", checkforneighbours= False)
+    prj.load_citygml(path= "C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION\NSB2017\FME\MuisstraatGML_FME.gml", lookforneighbours= False)
 
     prj.used_library_calc = 'IDEAS'
     prj.calc_all_buildings(raise_errors=True)

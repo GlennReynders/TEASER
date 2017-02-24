@@ -97,9 +97,7 @@ def load_gml(path, prj, lookforneighbours=False):
             except UserWarning:
                 print("bldg.generate_from_gml() did not work")
                 pass
-    #hier moet de functie aangeroepen worden voor alle gebouwen te checken op buren en hun muuroppervlaktes aan te passen
-    #bovenstaande for-lus wordt aangeroepen voor elke gebouwobject in de citygml, ze zijn dus nog niet allen aangemaakt,
-    #na de for-lus zijn ze wel allen aangemaakt
+
     if lookforneighbours is True:
         print("Searching for neighbours")
         for bldg in prj.buildings:

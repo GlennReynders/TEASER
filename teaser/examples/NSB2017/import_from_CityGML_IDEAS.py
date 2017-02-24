@@ -18,7 +18,7 @@ def example_type_building():
     that we load the XML data bases into our Project.
     This can take a few sec."""
 
-    prj = Project(load_data=True)
+    prj = Project(load_data=True, used_data_country="Belgium")
     prj.name = "TRYMuisstr"
   
     """Add here the path to your citygml file, function description: Loads buildings from a citygml file

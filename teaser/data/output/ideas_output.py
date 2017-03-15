@@ -457,7 +457,7 @@ def _help_buildingelement(ideasTemplate, structure_path, structurefile_path, con
     _help_records(recordTemplate="Construction", recordPath=constructions_path, prj=prj, bldg=bldg,
                   buildingelement=buildingelement, construction_mats=construction_mats)
     #add component-connection statements to help_connections
-    _help_connectcomponents(structure_path, buildingelement, zone, count_elementsinzone, ideasTemplate = ideasTemplate)
+    _help_connectcomponents(structure_path=structure_path, buildingelement=buildingelement, zone=zone, count_elementsinzone=count_elementsinzone, ideasTemplate = ideasTemplate)
 
 def _help_window (structure_path, constructions_path, prj, bldg, zone, zoneindex, buildingelement, elementindex, count_elementsinzone):
     #this should be deleted, for now okay, because teaser input is not able to go as detailed as now
@@ -503,7 +503,7 @@ def _help_window (structure_path, constructions_path, prj, bldg, zone, zoneindex
     _help_records(recordTemplate="Frame", recordPath=constructions_path, prj= prj, bldg = bldg, buildingelement=buildingelement,
                   frame_uvalue= frame_uvalue)
     #add component-connection statements
-    _help_connectcomponents(structure_path, buildingelement, zone, count_elementsinzone)
+    _help_connectcomponents(structure_path=structure_path, buildingelement=buildingelement, zone=zone, count_elementsinzone=count_elementsinzone)
 
 def _help_zone (structure_path, prj, bldg, zone, zoneindex, count_elementsinzone):
     #add zone to structure.mo file

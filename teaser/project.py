@@ -15,6 +15,8 @@ import teaser.data.output.aixlib_output as aixlib_output
 import teaser.data.output.annex60_output as annex60_output
 import teaser.data.output.ideas_output as ideas_output
 import teaser.data.output.text_output as text_out
+import teaser.data.output.ideas_analyse_results as ideas_analyse_results
+import teaser.data.output.ideas_output_loss_area as ideas_output_loss_area
 from teaser.data.dataclass import DataClass
 from teaser.logic.archetypebuildings.bmvbs.office import Office
 from teaser.logic.archetypebuildings.bmvbs.custom.institute import Institute
@@ -1312,6 +1314,36 @@ class Project(object):
                         building_model=building_model)
                 else:
                     pass
+
+    def export_ideas_analyse_results(self, packageDir = None, outputDir = None):
+        if packageDir is None:
+            packagepath = utilities.get_default_path() + "/" + self.name
+        else:
+            packagepath = packageDir
+        utilities.create_path(packagepath)
+
+        if outputDir is None:
+            outputpath = packagepath+"/Results"
+        else:
+            outputpath = outputDir
+        utilities.create_path(outputpath)
+
+        ideas_analyse_results.simulate_project(prj = self, outputDir= outputpath, packageDir= packagepath)
+        ideas_analyse_results.analyse_results(outputDir = outputpath)
+
+    def export_ideas_loss_area(self, internal_id = None, path = None):
+        if path is None:
+            path = utilities.get_default_path() + "/" + self.name
+        else:
+            path = path + "/" + self.name
+
+        utilities.create_path(path)
+
+        ideas_output_loss_area.export_loss_area(prj=self,
+                                    building_model="Detailed",
+                                    merge_windows=self.merge_windows_calc,
+                                    internal_id=internal_id,
+                                    exportpath=path)
 
     def export_parameters_txt(self, path=None):
         """Exports parameters of all buildings in a readable text file

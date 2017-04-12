@@ -287,6 +287,9 @@ class Building(object):
 
     def reset_outer_wall_area (self, gml_surface):
 
+        orientation = gml_surface.surface_orientation
+        common_area = 0
+
         for bldg in self.parent.buildings:
             if bldg.internal_id == self.internal_id:
                 pass #don't compare with the same building
@@ -297,44 +300,42 @@ class Building(object):
                     if neighbour_gml_surface.surface_tilt == 90:
                         if self.check_if_coplanar(gml_surface, neighbour_gml_surface):
                             #so unit_normal and constant are exactly the same
-                            #ASSUMPTION: each common wall is separated into multiple surface, the common and not-common
-                            #part of the comman wall are just separate
-                            #surface in GML. So, in depth, we don't need to do any checking. Only, in height, we need to.
-                            #functions to calculate the common area are included, in case your CityGML has not the same
-                            #features
+                            #calculate common area
+                            common_area += self.calculate_common_area(gml_surface, neighbour_gml_surface)
+                            #add neighbour building to neighbours list
+                            if bldg.name.replace(" ", "") in self.list_of_neighbours:
+                                pass  # this neighbour is already in list
+                            else:
+                                self.list_of_neighbours.append(bldg.name.replace(" ", ""))
+                            print("Common area between" + self.name + " and " + bldg.name + " is " + str(self.calculate_common_area(gml_surface, neighbour_gml_surface)))
+        if common_area != 0:
+            for zone in self.thermal_zones:
+                for i in zone.outer_walls:
+                    if i.orientation == orientation and i.tilt == 90:
+                        #i is the wall for which we are searching neighbours
+                        original_area_zone = i.area
+                        common_area_zone = (common_area / self.net_leased_area) * zone.area
+                        new_area_zone = original_area_zone - common_area_zone
 
-                            #check if this buildig is higher than the neighbour building
-                            #in that case: lower the OuterWall() area with the common area
-                            #else: delete the OuterWall() as a whole
-                            orientation = gml_surface.surface_orientation
-                            for zone in self.thermal_zones:
-                                if self.bldg_height > bldg.bldg_height:
-                                    new_area = gml_surface.surface_area - neighbour_gml_surface.surface_area
-                                    orientation = gml_surface.surface_orientation
-                                    self.set_outer_wall_area(new_area=new_area, orientation= orientation)
-                                    #print("Deleted outerwall area from " + self.name + " is " + str(neighbour_gml_surface.surface_area))
-                                    self.deleted_surfaces_area += neighbour_gml_surface.surface_area
-                                    self.number_of_deleted_walls += 1
-                                    #add to list of neighbours
-                                    if bldg.name.replace(" ", "") in self.list_of_neighbours:
-                                        pass  #this neighbour is already in list
-                                    else:
-                                        self.list_of_neighbours.append(bldg.name.replace(" ", ""))
-                                else:
-                                    #erase wall from list if orientation and area are the same
-                                    zone.outer_walls[:] = [wall for wall in zone.outer_walls if wall.orientation != orientation and wall.area != ((gml_surface.surface_area *
-                                             (1- self.est_factor_win_area) / self.net_leased_area) * zone.area)]
-                                    #print("Outerwall from " + self.name + " is deleted as a whole, area was " + str(gml_surface.surface_area))
-                                    self.deleted_surfaces_area += gml_surface.surface_area
-                                    self.number_of_deleted_walls += 1
-                                    #add to list of neighbours
-                                    if bldg.name.replace(" ", "") in self.list_of_neighbours:
-                                        pass  #  this neighbour is already in list
-                                    else:
-                                        self.list_of_neighbours.append(bldg.name.replace(" ", ""))
-                                # in each case, erase window from list if orientation is the same
-                                zone.windows[:] = [window for window in zone.windows if window.orientation != orientation and window.area != ((gml_surface.surface_area *
-                                    self.est_factor_win_area / self.net_leased_area) * zone.area)]
+                        if new_area_zone > 0:
+                            i.area = new_area_zone
+                            print("Deleted outerwall area from " + self.name + " is " + str(common_area_zone))
+                        else:
+                            zone.outer_walls[:] = [wall for wall in zone.outer_walls if
+                                                   wall.orientation != orientation and wall.area != (
+                                                   (gml_surface.surface_area *
+                                                    (1 - self.est_factor_win_area) / self.net_leased_area) * zone.area)]
+                            print("Outerwall from " + self.name + " is deleted as a whole, area was " + str(original_area_zone))
+
+                        zone.windows[:] = [window for window in zone.windows if
+                                           window.orientation != orientation and
+                                           window.area != ((gml_surface.surface_area *
+                                                        self.est_factor_win_area / self.net_leased_area) * zone.area)]
+
+                        self.deleted_surfaces_area += common_area_zone
+                        self.number_of_deleted_walls += 1
+        else:
+            print("Outerwall from " + self.name + " has no neighbour surface")
 
     def check_if_coplanar(self, gml_surface, neighbour_gml_surface):
 
@@ -366,6 +367,59 @@ class Building(object):
             return True
         else:
             return False
+
+    def calculate_common_area(self, gml_surface, neighbour_gml_surface):
+        #only call this function if you are sure that gml_surface and neighbour_gml_surface are coplanar
+        import teaser.data.input.citygml_input as citygml_in
+        from shapely.geometry import Polygon
+
+        basewall_help = gml_surface.gml_surface  # this is the coordinate list of the considered wall
+        basewall_unit_normal = gml_surface.unit_normal_vector  # this is the unit normal vector of the considered wall
+        basewall_constant = gml_surface.plane_equation_constant  # this is the plane equation constant of the considered wall
+        # we transform basewall_help to format: [(x0,y0,z0),(x1,y1,z1), ...]
+        basewall = [tuple(basewall_help[x:x + 3]) for x in xrange(0, len(basewall_help) - 3, 3)]
+
+        neighbour_help = neighbour_gml_surface.gml_surface  # this is the coordinate list of this possible neighbour
+        # we transform neighbour_help to format: [(x0,y0,z0),(x1,y1,z1), ...]
+        neighbour = [tuple(neighbour_help[x:x + 3]) for x in xrange(0, len(neighbour_help) - 3, 3)]
+
+        #CALCULATION OF COMMON AREA (only possible in 2D, so project surfaces on 2D plane)
+        #proj_axis is 'largest' element of the unit_normal_vector (always one none-zero component)
+        #proj_axis should be any direction for which the unit_normal_vector is not zero
+        proj_axis = max(range(3), key=lambda i: abs(basewall_unit_normal[i]))
+
+        #project returns a tuple of 2 coordinates in the projection plane
+        proj_basewall = [self.project(x, proj_axis) for x in basewall]
+        proj_neighbour = [self.project(x, proj_axis) for x in neighbour]
+        #Shapely is used to perform the intersection, returns the intersection polygon
+        proj_intersection = Polygon(proj_basewall).intersection(Polygon(proj_neighbour))
+        #return the coordinate list of the intersection in the format [(x0,y0),(x1,y1), ...] with xy = projection plane
+        proj_intersection_better = list(proj_intersection.exterior.coords)  # 5 points, last = first > closed polygon
+        #return the projection, so we have real coordinate list of the intersection polygon
+        intersection = [self.project_inv(x, proj_axis, basewall_unit_normal, basewall_constant) for x in
+                        proj_intersection_better]
+        # we make an SurfaceGML() for this intersection, other representation is needed [x0, y0, z0, ...]
+        intersection_better = [coordinate for tuplepair in intersection for coordinate in tuplepair]
+        intersection_gml = citygml_in.SurfaceGML(intersection_better)
+        common_area = intersection_gml.surface_area
+        return common_area
+
+    #some helper functions for calculate_common_area in case you would want to calculate the common area
+    def project(self, x, proj_axis):
+        # Project onto either the xy, yz, or xz plane.
+        # (We choose the one that avoids degenerate configurations, which is the purpose of proj_axis)
+        return tuple(c for i, c in enumerate(x) if i != proj_axis)
+
+    def project_inv(self, x, proj_axis, unit_normal, plane_equation_constant):
+        # Returns the vector w in the walls' plane such that project(w) equals x.
+        w = list(x)
+        w[proj_axis:proj_axis] = [0.0]
+        c = plane_equation_constant
+        for i in range(3):
+            c -= w[i] * unit_normal[i]
+        c /= unit_normal[proj_axis]
+        w[proj_axis] = c
+        return tuple(w)
 
     def set_window_area(
             self,

@@ -19,7 +19,7 @@ def example_type_building():
     This can take a few sec."""
 
     prj = Project(load_data=True, used_data_country="Belgium")
-    prj.name = "TRYMuisstr"
+    prj.name = "TRYTalingpark_LOD2_2"
   
     """Add here the path to your citygml file, function description: Loads buildings from a citygml file
     calls the function load_gml in data.CityGML we make use of CityGML core and possibly not all kinds of 
@@ -30,11 +30,19 @@ def example_type_building():
         Parameters:	
                 path : string
                 full path to a CityGML file """
-    prj.load_citygml(path="C:\Users\ina\Documents\GRB\CityGML Example files\MuisstraatGML_FME_232527.gml", lookforneighbours=True)
+    prj.load_citygml(path="C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION\CISBAT2017\FME/2_Model build up\Neighbourhood_Genk.gml", lookforneighbours=True)
 
     prj.used_library_calc = 'IDEAS'
     prj.calc_all_buildings(raise_errors=True)
     prj.export_ideas()
+    prj.export_ideas_loss_area()
+    #prj.export_ideas_analyse_results(packageDir=None, outputDir=None)  # simulates project and analyses the results
+    print("___________________________________________")
+    for bldg in prj.buildings:
+        print (bldg.name)
+        print (str(bldg.outer_area))
+        print (str(bldg.window_area))
+
 
 if __name__ == '__main__':
     example_type_building()

@@ -172,7 +172,7 @@ class BuildingElement(object):
         r_conduc = 0.0
         for count_layer in self.layer:
             r_conduc += (
-                count_layer.thickness / count_layer.material.thermal_conduc) \
+                count_layer.thickness / count_layer.material.thermal_conduc)
 
         self.r_conduc = r_conduc * (1 / self.area)
         self.r_inner_conv = (1 / self.inner_convection) * (1 / self.area)

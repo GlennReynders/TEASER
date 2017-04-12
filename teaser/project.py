@@ -12,8 +12,15 @@ import teaser.logic.utilities as utilities
 import teaser.data.input.teaserxml_input as txml_in
 import teaser.data.output.teaserxml_output as txml_out
 import teaser.data.output.aixlib_output as aixlib_output
+<<<<<<< HEAD
 import teaser.data.output.ibpsa_output as ibpsa_output
+=======
+import teaser.data.output.annex60_output as annex60_output
+import teaser.data.output.ideas_output as ideas_output
+>>>>>>> 6b2e6eb8a406d23cb9a5f1a0274bff976aa7877f
 import teaser.data.output.text_output as text_out
+import teaser.data.output.ideas_analyse_results as ideas_analyse_results
+import teaser.data.output.ideas_output_loss_area as ideas_output_loss_area
 from teaser.data.dataclass import DataClass
 from teaser.logic.archetypebuildings.bmvbs.office import Office
 from teaser.logic.archetypebuildings.bmvbs.custom.institute import Institute
@@ -51,6 +58,19 @@ class Project(object):
     load_data : boolean
         boolean if data bases for materials, type elements and use conditions
         should be loaded (default = True)
+    used_data_country: str
+        used country for loading data. Currently Belgium and Germany are supported.
+        Easy to add additional country: add 3 country files to the InputDataFolder (e.g. country_MaterialTemplates)
+            and add to list in load_type_elements
+        Additional guidelines for templates: do not change any of them
+            (otherwise you need to change the XSD scheme and many other things)
+            age categories do not need to be equal for all elements
+            but type should be heavy/light for all elements and
+            Kunststofffenster, Isolierverglasung for all windows (if you generate a singlefamilydwelling,
+            the window type is automatically set to this value, however, in case you don't use the singlefamilydwelling,
+            and the window type is not set, it is currently set to EnEv... NEEDS TO BE FIXED)
+        Belgium currently only works with heavy as contruction type and Kunststofffenster, Isolierverglasung as window type
+        (default: "Germany")
 
     Attributes
     ----------
@@ -78,7 +98,7 @@ class Project(object):
         used library (AixLib and IBPSA are supported)
     """
 
-    def __init__(self, load_data=True):
+    def __init__(self, load_data=True, used_data_country = "Germany"):
         """Constructor of Project Class.
         """
         self._name = "Project"
@@ -95,18 +115,20 @@ class Project(object):
         self.buildings = []
 
         self.load_data = load_data
+        self.used_data_country = used_data_country
 
         self._number_of_elements_calc = 2
         self._merge_windows_calc = False
         self._used_library_calc = "AixLib"
 
         if load_data is True:
-            self.data = self.instantiate_data_class()
+            assert self.used_data_country in ["Germany", "Belgium"]
+            self.data = self.instantiate_data_class(self.used_data_country)
         else:
             self.data = None
 
     @staticmethod
-    def instantiate_data_class():
+    def instantiate_data_class(country):
         """Initialization of DataClass
 
         Returns
@@ -115,7 +137,7 @@ class Project(object):
         DataClass : Instance of DataClass()
 
         """
-        return DataClass()
+        return DataClass(country)
 
     def calc_all_buildings(self, raise_errors=False):
         """Calculates values for all project buildings
@@ -1111,7 +1133,7 @@ class Project(object):
 
         citygml_out.save_gml(self, new_path)
 
-    def load_citygml(self, path=None):
+    def load_citygml(self, path=None, lookforneighbours=False):
         """Loads buildings from a citygml file
 
         calls the function load_gml in data.CityGML we make use of CityGML core
@@ -1133,7 +1155,7 @@ class Project(object):
 
         """
 
-        citygml_in.load_gml(path, self)
+        citygml_in.load_gml(path, self, lookforneighbours=lookforneighbours)
 
     def export_aixlib(
             self,
@@ -1240,6 +1262,85 @@ class Project(object):
                         prj=self,
                         path=path)
 
+
+    def export_ideas(
+            self,
+            internal_id=None,
+            path=None,
+            building_model="One-zone"):
+
+        """Exports values to a record file for Modelica simulation
+
+        For IDEAS Library
+
+        Parameters
+        ----------
+
+        internal_id : float
+            setter of a specific building which will be exported, if None then
+            all buildings will be exported
+        path : string
+            if the Files should not be stored in default output path of TEASER,
+            an alternative path can be specified as a full path
+        """
+
+        if path is None:
+            path = os.path.join(
+                utilities.get_default_path(),
+                self.name)
+        else:
+            path = os.path.join(
+                path,
+                self.name)
+
+        utilities.create_path(path)
+
+        if internal_id is None:
+            ideas_output.export_ideas(
+                buildings=self.buildings,
+                prj=self,
+                path=path,
+                building_model=building_model)
+        else:
+            for bldg in self.buildings:
+                if bldg.internal_id == internal_id:
+                    ideas_output.export_ideas(
+                        buildings=[bldg],
+                        prj=self,
+                        path=path,
+                        building_model=building_model)
+                else:
+                    pass
+
+    def export_ideas_analyse_results(self, packageDir = None, outputDir = None):
+        if packageDir is None:
+            packagepath = utilities.get_default_path() + "/" + self.name
+        else:
+            packagepath = packageDir
+        utilities.create_path(packagepath)
+
+        if outputDir is None:
+            outputpath = packagepath+"/Results"
+        else:
+            outputpath = outputDir
+        utilities.create_path(outputpath)
+
+        ideas_analyse_results.simulate_project(prj = self, outputDir= outputpath, packageDir= packagepath)
+        ideas_analyse_results.analyse_results(outputDir = outputpath)
+
+    def export_ideas_loss_area(self, internal_id = None, path = None):
+        if path is None:
+            path = utilities.get_default_path() + "/" + self.name
+        else:
+            path = path + "/" + self.name
+
+        utilities.create_path(path)
+
+        ideas_output_loss_area.export_loss_area(prj=self,
+                                    building_model="Detailed",
+                                    merge_windows=self.merge_windows_calc,
+                                    internal_id=internal_id,
+                                    exportpath=path)
 
     def export_parameters_txt(self, path=None):
         """Exports parameters of all buildings in a readable text file

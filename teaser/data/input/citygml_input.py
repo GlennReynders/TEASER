@@ -29,7 +29,7 @@ from teaser.logic.archetypebuildings.bmvbs.office import Office
 from teaser.logic.buildingobjects.building import Building
 
 
-def load_gml(path, prj):
+def load_gml(path, prj, lookforneighbours=False):
     """This function loads buildings from a CityGML file
 
     This function is a proof of concept, be careful using it.
@@ -98,6 +98,14 @@ def load_gml(path, prj):
                 print("bldg.generate_from_gml() did not work")
                 pass
 
+    if lookforneighbours is True:
+        print("Searching for neighbours")
+        for bldg in prj.buildings:
+            for surface in bldg.gml_surfaces:
+                if surface.surface_tilt == 90: #it's an OuterWall
+                        bldg.reset_outer_wall_area(surface)
+    else:
+        pass
 
 def _set_attributes(bldg, gml_bldg):
     """tries to set attributes for type building generation
@@ -235,10 +243,17 @@ class SurfaceGML(object):
         self.surface_area = None
         self.surface_orientation = None
         self.surface_tilt = None
+        self.unit_normal_vector = None
 
         self.surface_area = self.get_gml_area()
         self.surface_orientation = self.get_gml_orientation()
         self.surface_tilt = self.get_gml_tilt()
+
+        split_surface = list(zip(*[iter(self.gml_surface)] * 3))
+        self.unit_normal_vector = self.unit_normal(a=split_surface[0], b=split_surface[1], c=split_surface[2])
+        self.plane_equation_constant = self.unit_normal_vector[0] * self.gml_surface[0] + self.unit_normal_vector[1] * \
+                                                                                          self.gml_surface[1] + \
+                                       self.unit_normal_vector[2] * self.gml_surface[2]
 
     def get_gml_area(self):
         """calc the area of a gml_surface defined by gml coordinates

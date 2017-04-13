@@ -9,6 +9,7 @@ import re
 import warnings
 from teaser.logic.buildingobjects.calculation.aixlib import AixLib
 from teaser.logic.buildingobjects.calculation.ibpsa import IBPSA
+from teaser.logic.buildingobjects.calculation.ideas import IDEAS
 
 
 from teaser.logic.buildingobjects.buildingsystems.buildingahu \
@@ -434,7 +435,7 @@ class Building(object):
             True for merging the windows into the outer walls, False for
             separate resistance for window, default is False
         used_library : str
-            used library (AixLib and IBPSA are supported)
+            used library (AixLib, IBPSA and IDEAS are supported)
         """
 
         self._number_of_elements_calc = number_of_elements
@@ -459,6 +460,8 @@ class Building(object):
                 self.library_attr.calc_auxiliary_attr()
             elif self.used_library_calc == 'IBPSA':
                 self.library_attr = IBPSA(parent=self)
+            elif self.used_library_calc == 'IDEAS':
+                self.library_attr = IDEAS(parent=self)
         else:
             warnings.warn("You set conflicting options for the used library "
                           "in Building or Project class and "
@@ -472,6 +475,8 @@ class Building(object):
                 self.library_attr.calc_auxiliary_attr()
             elif self.used_library_calc == 'IBPSA':
                 self.library_attr = IBPSA(parent=self)
+            elif self.used_library_calc == 'IDEAS':
+                self.library_attr = IDEAS(parent=self)
 
     def retrofit_building(
             self,
@@ -791,9 +796,9 @@ class Building(object):
     @used_library_calc.setter
     def used_library_calc(self, value):
 
-        ass_error_1 = "used library needs to be AixLib or IBPSA"
+        ass_error_1 = "used library needs to be AixLib, IBPSA or IDEAS"
 
-        assert value != ["AixLib", "IBPSA"], ass_error_1
+        assert value != ["AixLib", "IBPSA", "IDEAS"], ass_error_1
 
         if self.parent is None and value is None:
             self._used_library_calc = "AixLib"
@@ -806,5 +811,5 @@ class Building(object):
             self.library_attr = AixLib(parent=self)
         elif self.used_library_calc == 'IBPSA':
             self.library_attr = IBPSA(parent=self)
-
-
+        elif self.used_library_calc == 'IDEAS':
+            self.library_attr = IDEAS(parent=self)

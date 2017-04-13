@@ -13,6 +13,7 @@ import teaser.data.input.teaserxml_input as txml_in
 import teaser.data.output.teaserxml_output as txml_out
 import teaser.data.output.aixlib_output as aixlib_output
 import teaser.data.output.ibpsa_output as ibpsa_output
+import teaser.data.output.ideas_output as ideas_output
 import teaser.data.output.text_output as text_out
 from teaser.data.dataclass import DataClass
 from teaser.logic.archetypebuildings.bmvbs.office import Office
@@ -75,7 +76,7 @@ class Project(object):
         separate resistance for window, default is False (only supported for
         IBPSA)
     used_library_calc : str
-        used library (AixLib and IBPSA are supported)
+        used library (AixLib, IBPSA and IDEAS are supported)
     """
 
     def __init__(self, load_data=True):
@@ -133,7 +134,7 @@ class Project(object):
             For AixLib vdi calculation is True, ebc calculation is False
 
         used_library_calc : str
-            used library (AixLib and IBPSA are supported)
+            used library (AixLib, IBPSA and IDEAS  are supported)
 
         """
         if raise_errors is True:
@@ -1254,6 +1255,55 @@ class Project(object):
                         prj=self,
                         path=path)
 
+
+    def export_ideas(
+            self,
+            internal_id=None,
+            path=None,
+            building_model="One-zone"):
+
+        """Exports values to a record file for Modelica simulation
+
+        For IDEAS Library
+
+        Parameters
+        ----------
+
+        internal_id : float
+            setter of a specific building which will be exported, if None then
+            all buildings will be exported
+        path : string
+            if the Files should not be stored in default output path of TEASER,
+            an alternative path can be specified as a full path
+        """
+
+        if path is None:
+            path = os.path.join(
+                utilities.get_default_path(),
+                self.name)
+        else:
+            path = os.path.join(
+                path,
+                self.name)
+
+        utilities.create_path(path)
+
+        if internal_id is None:
+            ideas_output.export_ideas(
+                buildings=self.buildings,
+                prj=self,
+                path=path,
+                building_model=building_model)
+        else:
+            for bldg in self.buildings:
+                if bldg.internal_id == internal_id:
+                    ideas_output.export_ideas(
+                        buildings=[bldg],
+                        prj=self,
+                        path=path,
+                        building_model=building_model)
+                else:
+                    pass
 
     def export_parameters_txt(self, path=None):
         """Exports parameters of all buildings in a readable text file

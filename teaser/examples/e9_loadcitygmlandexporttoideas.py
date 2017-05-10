@@ -29,20 +29,43 @@ def example_save():
     # given in the file and the way the buildings are modeled.
 
     prj_gml = Project(load_data=True)
-    prj_gml.name = "CityGMLSample"
+    prj_gml.name = "CityGMLSample_Genk_5"
 
     load_gml = utilities.get_full_path(os.path.join(
         'examples',
         'examplefiles',
         'CityGMLSample.gml'))
 
-    prj_gml.load_citygml(path=load_gml)
+    prj_gml.load_citygml(path="C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION\CISBAT2017\FME/2_Model build up\Neighbourhood_Genk_works.gml")
     prj_gml.used_library_calc = 'IDEAS'
     #prj_gml.calc_all_buildings(raise_errors=True)
     prj_gml.export_ideas()
 
     # After you imported your teaser project one or another way into you
     # python environment you can access variables and functions.
+
+    # if: internal_id is given, then we look for the buildings in our project,
+    # for which the internal_id matches
+    # (this could be more than 1 building), only these buildings are exported
+
+    exported_list_of_buildings = prj_gml.buildings
+
+    # for now, the only option is detailed
+    print("Printing all buildings, zones and buildingelements")
+    for bldgindex, bldg in enumerate(exported_list_of_buildings):
+        for zoneindex, zone in enumerate(bldg.thermal_zones, start=1):
+            print("Building name: " + bldg.name)
+            # loop all building elements of this zone
+            buildingelements = zone.outer_walls + zone.inner_walls + zone.windows + zone.rooftops + zone.ground_floors + zone.ceilings + zone.floors
+            count_outerwalls_area = 0
+            count_rooftops_area = 0
+            count_groundfloors_area = 0
+            count_innerwalls_area = 0
+            count_ceilings_area = 0
+            count_floors_area = 0
+            count_windows_area = 0
+            for elementindex, buildingelement in enumerate(buildingelements, start=1):
+                print(buildingelement.name)
 
 
 if __name__ == '__main__':

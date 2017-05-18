@@ -29,14 +29,15 @@ def example_save():
     # given in the file and the way the buildings are modeled.
 
     prj_gml = Project(load_data=True)
-    prj_gml.name = "CityGMLSample_Genk_5"
+    prj_gml.name = "CityGMLSample_Genk_round2_3"
 
     load_gml = utilities.get_full_path(os.path.join(
         'examples',
         'examplefiles',
         'CityGMLSample.gml'))
 
-    prj_gml.load_citygml(path="C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION\CISBAT2017\FME/2_Model build up\Neighbourhood_Genk_works.gml")
+    prj_gml.load_citygml(path="C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION/4DH2017\FME\Real model build up\Waterschei_works.gml",
+                         checkadjacantbuildings=True)
     prj_gml.used_library_calc = 'IDEAS'
     #prj_gml.calc_all_buildings(raise_errors=True)
     prj_gml.export_ideas()
@@ -55,6 +56,8 @@ def example_save():
     for bldgindex, bldg in enumerate(exported_list_of_buildings):
         for zoneindex, zone in enumerate(bldg.thermal_zones, start=1):
             print("Building name: " + bldg.name)
+            print("Zone name: " + str(zone.name) + " " + str(zone.internal_id))
+            print("Building number of floors: " + str(bldg.number_of_floors))
             # loop all building elements of this zone
             buildingelements = zone.outer_walls + zone.inner_walls + zone.windows + zone.rooftops + zone.ground_floors + zone.ceilings + zone.floors
             count_outerwalls_area = 0
@@ -65,7 +68,7 @@ def example_save():
             count_floors_area = 0
             count_windows_area = 0
             for elementindex, buildingelement in enumerate(buildingelements, start=1):
-                print(buildingelement.name)
+                print(buildingelement.name + " has a tilt of " + str(buildingelement.tilt))
 
 
 if __name__ == '__main__':

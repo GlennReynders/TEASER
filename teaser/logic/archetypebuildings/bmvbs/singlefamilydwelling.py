@@ -597,7 +597,6 @@ class SingleFamilyDwelling(Residential):
                     self.set_outer_wall_area(surface.surface_area,
                                              surface.surface_orientation)
         for surface in self.gml_surfaces:
-
             if surface.surface_tilt != 0 and surface.surface_orientation != \
                     -2 and surface.surface_orientation != -1:
                 self.set_window_area(surface.surface_area *

@@ -8,6 +8,7 @@ CityGML file format .gml
 """
 import numpy as np
 from numpy import linalg as LA
+import random
 import pyxb
 import pyxb.utils
 import pyxb.namespace
@@ -242,6 +243,7 @@ class SurfaceGML(object):
                  boundary=None):
         self.gml_surface = gml_surface
         self.name = boundary
+        self.internal_id = random.random()
         self.surface_area = None
         self.surface_orientation = None
         self.surface_tilt = None

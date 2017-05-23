@@ -37,7 +37,7 @@ def example_save():
         'CityGMLSample.gml'))
 
     prj_gml.load_citygml(path="C:\Users\ina\Box Sync\Onderzoek\UNDER CONSTRUCTION/4DH2017\FME\Real model build up\Waterschei_works.gml",
-                         checkadjacantbuildings=True)
+                         checkadjacantbuildings=False)
     prj_gml.used_library_calc = 'IDEAS'
     #prj_gml.calc_all_buildings(raise_errors=True)
     prj_gml.export_ideas()
@@ -68,8 +68,7 @@ def example_save():
             count_floors_area = 0
             count_windows_area = 0
             for elementindex, buildingelement in enumerate(buildingelements, start=1):
-                print(buildingelement.name + " has a tilt of " + str(buildingelement.tilt))
-
+                print(buildingelement.name + " has a tilt of " + str(buildingelement.tilt) + " and an orient of " + str(buildingelement.orientation) + " and an area of " + str(buildingelement.area))
 
 if __name__ == '__main__':
     example_save()

@@ -257,6 +257,31 @@ class Building(object):
             if self.net_leased_area < 50.0:
                 self.net_leased_area = 50.0
 
+    def set_window_area(
+            self,
+            new_area,
+            orientation):
+        """Window area setter
+
+        sets the window area of all windows of one direction and weights
+        them according to zone size
+
+        Parameters
+        ----------
+        new_area : float
+            new_area of all window of one orientation
+        orientation : float
+            orientation of the obtained windows
+        """
+
+        for zone in self.thermal_zones:
+            for win in zone.windows:
+                if win.orientation == orientation:
+                    if win.area == None:
+                        win.area = ((new_area / self.net_leased_area) * zone.area)
+                    else:
+                        win.area += ((new_area / self.net_leased_area) * zone.area)
+
     def set_outer_wall_area(
             self,
             new_area,
@@ -278,13 +303,22 @@ class Building(object):
         for zone in self.thermal_zones:
             for wall in zone.outer_walls:
                 if wall.orientation == orientation:
-                    wall.area = ((new_area / self.net_leased_area) * zone.area)
+                    if wall.area == None:
+                        wall.area = ((new_area / self.net_leased_area) * zone.area)
+                    else:
+                        wall.area += ((new_area / self.net_leased_area) * zone.area)
             for roof in zone.rooftops:
                 if roof.orientation == orientation:
-                    roof.area = ((new_area / self.net_leased_area) * zone.area)
+                    if roof.area == None:
+                        roof.area = ((new_area / self.net_leased_area) * zone.area)
+                    else:
+                        roof.area += ((new_area / self.net_leased_area) * zone.area)
             for ground in zone.ground_floors:
                 if ground.orientation == orientation:
-                    ground.area = ((new_area / self.net_leased_area) * zone.area)
+                    if ground.area == None:
+                        ground.area = ((new_area / self.net_leased_area) * zone.area)
+                    else:
+                        ground.area += ((new_area / self.net_leased_area) * zone.area)
 
     def reset_outer_wall_area (self, gml_surface):
         for bldg in self.parent.buildings:
@@ -432,28 +466,6 @@ class Building(object):
         c /= unit_normal[proj_axis]
         w[proj_axis] = c
         return tuple(w)
-
-    def set_window_area(
-            self,
-            new_area,
-            orientation):
-        """Window area setter
-
-        sets the window area of all windows of one direction and weights
-        them according to zone size
-
-        Parameters
-        ----------
-        new_area : float
-            new_area of all window of one orientation
-        orientation : float
-            orientation of the obtained windows
-        """
-
-        for zone in self.thermal_zones:
-            for win in zone.windows:
-                if win.orientation == orientation:
-                    win.area = ((new_area / self.net_leased_area) * zone.area)
 
     def get_outer_wall_area(self, orientation):
         """Get aggregated wall area of one orientation

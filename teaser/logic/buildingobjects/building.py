@@ -7,6 +7,7 @@ import inspect
 import random
 import re
 import warnings
+import numpy as np
 from decimal import *
 
 from teaser.logic.buildingobjects.calculation.aixlib import AixLib
@@ -322,7 +323,7 @@ class Building(object):
 
     def reset_outer_wall_area (self, gml_surface):
         for bldg in self.parent.buildings:
-            if bldg.internal_id == 0: #self.internal_id > wel in gebouw zelf kijken om zoldermuren te verwijderen:
+            if bldg.internal_id == 10: #self.internal_id >>> wel in gebouw zelf kijken om zoldermuren te verwijderen:
                 pass #if building from project.building equals this building, don't add to common area
             else: # if other building, add to common area
                 for neighbour_gml_surface in bldg.gml_surfaces:
@@ -341,34 +342,39 @@ class Building(object):
 
                             for zone in self.thermal_zones:
                                 common_area = self.calculate_common_area(gml_surface=gml_surface, neighbour_gml_surface=neighbour_gml_surface)
-                                if common_area < gml_surface.surface_area:
-                                    self.set_outer_wall_area(new_area=common_area, orientation=orientation)
-                                    self.deleted_surfaces_area += (gml_surface.surface_area - common_area)
-                                    print("Outerwall area of " + self.name + " was reduced from " + str(
-                                        gml_surface.surface_area) + " with " + str(common_area))
-
-                                else:
-                                    #delete wall as a whole
-                                    #erase wall from list if orientation and area are the same
-                                    zone.outer_walls[:] = [wall for wall in zone.outer_walls if wall.orientation != orientation and wall.area != ((gml_surface.surface_area *
-                                             (1- self.est_factor_win_area) / self.net_leased_area) * zone.area)]
-                                    self.deleted_surfaces_area += gml_surface.surface_area
-                                    print("Outerwall of " + self.name + " is deleted as a whole, area was " + str(gml_surface.surface_area))
-
-                                # in each case, erase window from list if orientation is the same
-                                zone.windows[:] = [window for window in zone.windows if window.orientation != orientation and window.area != ((gml_surface.surface_area *
-                                    self.est_factor_win_area / self.net_leased_area) * zone.area)]
-
+                                common_area = common_area / self.net_leased_area * zone.area    # reduce total wall area to area allocated to this zone
                                 if common_area == 0:
-                                    print("Printing out list with outerwalls")
-                                    for outerwall in zone.outer_walls:
-                                        print (outerwall.name)
-                                        print (outerwall.tilt)
-                                        print (outerwall.orientation)
-                                        print (outerwall.area)
+                                    # walls are coplanar, but do not overlap
+                                    print("Common area was 0. Printing out list with outerwalls")
+                                    if self.name == "Talingpark_7_1":
+                                        for outerwall in zone.outer_walls:
+                                            print (outerwall.name)
+                                            print (outerwall.tilt)
+                                            print (outerwall.orientation)
+                                            print (outerwall.area)
+                                else:
+                                    # if walls overlap: delete window of basewall, add the deleted window area to the wall area and reduce the wall area by the common_area
+                                    for window in zone.windows:
+                                        if window.orientation == orientation:
+                                            window_area = window.area
+                                            zone.windows.remove(window)
+                                            # add deleted window area to wall area
+                                            for wall in zone.outer_walls:
+                                                if wall.orientation == orientation:
+                                                    wall.area += window_area
+                                            print("A window was deleted, area of " + str(window_area) + " was added to the corresponding wall")
+                                    for wall in zone.outer_walls:
+                                        if wall.orientation == orientation:
+                                            wall.area -= common_area
+                                            self.deleted_surfaces_area += common_area
+                                            if wall.area < 0.0001: #rounding errors are possible (smaller than 1 sq cm is considered to be 0)
+                                                print("An outer wall of " + self.name + " was deleted as a whole, common area was " + str(common_area))
+                                                zone.outer_walls.remove(wall)
+                                            else:
+                                                print("An outer wall of " + self.name + " was reduced from " + str(wall.area+common_area) + " to " + str(wall.area))
                                 print("/")
 
-    def check_if_coplanar(self, gml_surface, neighbour_gml_surface):
+    def check_if_coplanar(self, gml_surface, neighbour_gml_surface, tolerance = True):
 
         basewall_help = gml_surface.gml_surface  # this is the coordinate list of the considered wall
         basewall_unit_normal = gml_surface.unit_normal_vector  # this is the unit normal vector of the considered wall
@@ -382,22 +388,59 @@ class Building(object):
         neighbour_equation = [elem for elem in neighbour_unit_normal]
         neighbour_equation.append(neighbour_constant)
 
-        #elements from the equations arrays are floats, we convert them to decimal (correct comparison test)
-        #transform floats to decimals
-        basewall_equation = [Decimal.from_float(i) for i in basewall_equation]
-        neighbour_equation = [Decimal.from_float(i) for i in neighbour_equation]
-        #round these decimals
-        basewall_equation = [i.quantize(Decimal('0.0001'), rounding= ROUND_HALF_DOWN) for i in basewall_equation]
-        neighbour_equation = [i.quantize(Decimal('0.0001'), rounding= ROUND_HALF_DOWN) for i in neighbour_equation]
+        if tolerance:
+            tolerance_normal = Decimal.from_float(0.005) #tolerance in radians
+            tolerance_constant = Decimal.from_float(0.005) #tolerance in metres
+            angle_between = np.arctan((neighbour_equation[0]/neighbour_equation[1])) - np.arctan((basewall_equation[0]/basewall_equation[1])) #angle between planes in radians
 
-        #check if equal
-        if (basewall_equation[0] == (-1)*neighbour_equation[0] and basewall_equation[1] == (-1)*neighbour_equation[1]\
-            and basewall_equation[2] == (-1)*neighbour_equation[2] and basewall_equation[3] == (-1)*neighbour_equation[3])\
-            or (basewall_equation[0] == neighbour_equation[0] and basewall_equation[1] == neighbour_equation[1]\
-            and basewall_equation[2] == neighbour_equation[2] and basewall_equation[3] == neighbour_equation[3]):
-            return True
+            #distance between points on surface and intersection line of planes
+            dist_to_intersect = np.absolute(((basewall_equation[0]-neighbour_equation[0])*neighbour_help[0] + \
+                                             (basewall_equation[1]-neighbour_equation[1])*neighbour_help[1] - \
+                                             (basewall_equation[3]-neighbour_equation[3]))) / \
+                                np.sqrt(np.square(basewall_equation[0]-neighbour_equation[0]) + \
+                                        np.square(basewall_equation[1]-neighbour_equation[1]))
+            dist_to_surface = np.tan(angle_between)*dist_to_intersect
+            a = np.absolute((((basewall_equation[0]-neighbour_equation[0])*neighbour_help[0]) + \
+                             ((basewall_equation[1]-neighbour_equation[1])*neighbour_help[1]) + \
+                                             (((-1)*basewall_equation[3])+neighbour_equation[3])))
+            c=((basewall_equation[0]-neighbour_equation[0])*neighbour_help[0])
+            d=(basewall_equation[1]-neighbour_equation[1])*neighbour_help[1]
+            e=(basewall_equation[3]-neighbour_equation[3])
+            b= np.sqrt(np.square(basewall_equation[0]-neighbour_equation[0]) + \
+                                        np.square(basewall_equation[1]-neighbour_equation[1]))
+
+            # check if equal
+            if ((((-1)*tolerance_normal) <= angle_between <= tolerance_normal) \
+                        and (((-1)*tolerance_constant) <= dist_to_surface <= tolerance_constant)):
+                if self.name == "Talingpark_7_1":
+                    print(angle_between)
+                    print(a)
+                    print(c)
+                    print(d)
+                    print(e)
+                    print(b)
+                    print(dist_to_intersect)
+                    print(dist_to_surface)
+                return True
+            else:
+                return False
         else:
-            return False
+            #NO tolerance on surface > exact match ! Watch out for floats > Decimals
+            # elements from the equations arrays are floats, we convert them to decimal (correct comparison test)
+            # transform floats to decimals
+            b_eq = [Decimal.from_float(i) for i in basewall_equation]
+            n_eq = [Decimal.from_float(i) for i in neighbour_equation]
+
+            # round these decimals
+            b_eq = [i.quantize(Decimal('0.001'), rounding=ROUND_HALF_DOWN) for i in b_eq]
+            n_eq = [i.quantize(Decimal('0.001'), rounding=ROUND_HALF_DOWN) for i in n_eq]
+
+            #check if equal
+            if (b_eq[0] == (-1) * n_eq[0] and b_eq[1] == (-1) * n_eq[1] and b_eq[2] == (-1) * n_eq[2] \
+                        and b_eq[3] == (-1) * neighbour_help[3]): #we know surface normals point outwards !
+                return True
+            else:
+                return False
 
     def calculate_common_area(self, gml_surface, neighbour_gml_surface):
         #only call this function if you are sure that gml_surface and neighbour_gml_surface are coplanar
@@ -409,12 +452,19 @@ class Building(object):
         basewall_constant = gml_surface.plane_equation_constant  # this is the plane equation constant of the considered wall
         # we transform basewall_help to format: [(x0,y0,z0),(x1,y1,z1), ...]
         basewall = [tuple(basewall_help[x:x + 3]) for x in xrange(0, len(basewall_help) - 3, 3)]
+        print(self.name)
         print ("Basewall: " + str(basewall))
+        print (str(gml_surface.unit_normal_vector))
+        print (str(gml_surface.plane_equation_constant))
+        print(str(gml_surface.surface_orientation))
 
         neighbour_help = neighbour_gml_surface.gml_surface  # this is the coordinate list of this possible neighbour
         # we transform neighbour_help to format: [(x0,y0,z0),(x1,y1,z1), ...]
         neighbour = [tuple(neighbour_help[x:x + 3]) for x in xrange(0, len(neighbour_help) - 3, 3)]
         print("Neighbour: " + str(neighbour))
+        print (str(neighbour_gml_surface.unit_normal_vector))
+        print (str(neighbour_gml_surface.plane_equation_constant))
+        print(str(neighbour_gml_surface.surface_orientation))
         #CALCULATION OF COMMON AREA (only possible in 2D, so project surfaces on 2D plane)
         #proj_axis is 'largest' element of the unit_normal_vector (always one none-zero component)
         #proj_axis should be any direction for which the unit_normal_vector is not zero
